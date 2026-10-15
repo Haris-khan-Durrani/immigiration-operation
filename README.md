@@ -15,13 +15,14 @@ This guide takes a new installation from downloading the code to serving it at `
 7. [Email and CRM](#email-and-crm)
 8. [Environment reference](#environment-reference)
 9. [Native installation without Docker](#native-installation-without-docker)
-10. [Manual Linux production service](#manual-linux-production-service)
-11. [Administration](#administration)
-12. [Backups and recovery](#backups-and-recovery)
-13. [Updates and rollback](#updates-and-rollback)
-14. [Tests](#tests)
-15. [Troubleshooting](#troubleshooting)
-16. [Deployment limits](#deployment-limits)
+10. [Live installation with PM2](#live-installation-with-pm2)
+11. [Manual Linux production service](#manual-linux-production-service)
+12. [Administration](#administration)
+13. [Backups and recovery](#backups-and-recovery)
+14. [Updates and rollback](#updates-and-rollback)
+15. [Tests](#tests)
+16. [Troubleshooting](#troubleshooting)
+17. [Deployment limits](#deployment-limits)
 
 ## Workflow
 
@@ -346,6 +347,201 @@ npm start
 ```
 
 Open http://localhost:3000. Ctrl+C stops the process. A live Contract Manager cannot reach localhost.
+
+## Live installation with PM2
+
+PM2 is an alternative to Docker or the manual application systemd service. It keeps the Node process running, restarts it after a crash and can restore it at server boot. You still need MySQL, a domain, HTTPS and persistent private storage. PM2 does not install MySQL, issue certificates, run migrations or configure email for you.
+
+The steps below target an Ubuntu VPS. Run application/PM2 commands as the **same non-root deployment user** each time. Only OS installation and the generated boot-service command need sudo. Do not mix `pm2` with `sudo pm2`: they manage different process lists and home directories.
+
+### 1. Prepare Node.js, MySQL and the project
+
+Install Node.js 24, npm, Git and MySQL 8 using the native installation prerequisites above. Verify your Node executable before installing PM2:
+
+```bash
+node --version
+npm --version
+command -v node
+```
+
+Node should report v24.x. With a system-wide Node installation:
+
+```bash
+sudo npm install --global pm2
+pm2 --version
+```
+
+If Node is installed through a user-owned version manager, install PM2 without sudo in that user's Node environment. Its startup command will need that exact Node path; regenerate startup configuration after changing Node versions.
+
+For a fresh checkout owned by your deployment user:
+
+```bash
+sudo mkdir -p /srv/operations
+sudo chown "$USER":"$(id -gn)" /srv/operations
+git clone https://github.com/Haris-khan-Durrani/immigiration-operation.git /srv/operations
+cd /srv/operations
+npm ci --omit=dev
+cp .env.example .env
+chmod 600 .env
+nano .env
+```
+
+If the directory already contains the application, skip cloning/copying `.env`. Preserve the original encryption key and private files. If migrating from another supervisor, first stop its app process so it cannot compete for port 3000 or execute the same background jobs. Stop only this application's service/container, not other PM2 applications.
+
+Create the native MySQL database/account using the SQL in [Native installation](#native-installation-without-docker). The Docker service name `mysql` will not work as a native database hostname unless separately configured to resolve.
+
+Set at least these values in `.env`:
+
+```dotenv
+NODE_ENV=production
+APP_URL=https://operations.example.com
+HOST=127.0.0.1
+PORT=3000
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_DATABASE=operations
+MYSQL_USER=operations
+MYSQL_PASSWORD=YOUR_DATABASE_ACCOUNT_PASSWORD
+ENCRYPTION_KEY=YOUR_64_HEXADECIMAL_CHARACTER_KEY
+UPLOAD_DIR=private-uploads
+EMAIL_DELIVERY_ENABLED=false
+```
+
+Generate a key only for a new empty installation using the earlier Node command. Keep `.env` private. Leave INITIAL_ADMIN_EMAIL/PASSWORD blank for interactive creation. MYSQL_ROOT_PASSWORD is unnecessary for the native application connection.
+
+```bash
+mkdir -p private-uploads backups
+chmod 700 private-uploads backups
+npm run db:migrate
+npm run admin:create
+```
+
+The admin command is for first installation only. PM2 startup does not run migrations or create an administrator.
+
+### 2. Start using the included PM2 configuration
+
+The repository includes [ecosystem.config.cjs](ecosystem.config.cjs). It starts the server directly with Node and loads `.env` through Node's `--env-file` flag. Its working directory is the project directory, so relative upload/backup paths resolve consistently.
+
+```bash
+cd /srv/operations
+pm2 start ecosystem.config.cjs --only operations
+pm2 status
+pm2 logs operations --lines 100
+```
+
+Press Ctrl+C to leave the log viewer; the app continues running. Verify the local web listener:
+
+```bash
+curl -I http://127.0.0.1:3000/
+```
+
+The configuration uses one **fork-mode** process, disables file watching and automatically restarts after failure with a five-second delay. Keep one instance: the app includes its own maintenance/email timer. Do not enable cluster mode or use `pm2 scale` without implementing multi-worker coordination.
+
+The `.cjs` extension is intentional because this repository uses ES modules while the PM2 configuration exports CommonJS. Do not rename it to `.js`. It contains no credentials; secrets stay in `.env`.
+
+### 3. Put HTTPS in front of PM2
+
+Follow [Domain and HTTPS](#domain-and-https) to point DNS and configure Caddy. The same proxy target, `127.0.0.1:3000`, works with PM2. Keep port 3000 private and open the application through `https://operations.example.com`.
+
+The included PM2 configuration explicitly sets NODE_ENV=production, enabling Secure cookies even if `.env` says development. HTTP is only useful for checking the local listener; sign in over HTTPS. Use `npm start` with development configuration for local HTTP development instead of this production PM2 configuration.
+
+Complete [workspace setup](#first-administrator-and-workspace-setup), [Contract Manager linking](#connect-contract-manager) and [email configuration](#email-and-crm). PM2 being online does not verify these integrations.
+
+### 4. Automatically start after a server reboot
+
+As the same deployment user:
+
+```bash
+pm2 startup systemd
+```
+
+PM2 prints a command beginning with `sudo env PATH=...`. Run **the exact generated command** on that server; it includes the correct username, home and Node/PM2 paths. Then save the current process list:
+
+```bash
+pm2 save
+```
+
+This saves all applications managed by that user's PM2 daemon, so review `pm2 status` first. The startup command installs the PM2 systemd boot service; it does not replace the need for `pm2 save`. Confirm the generated `pm2-YOUR_DEPLOY_USER` service is enabled:
+
+```bash
+sudo systemctl status pm2-YOUR_DEPLOY_USER
+```
+
+During an approved maintenance window, reboot and verify HTTPS and `pm2 status` afterward. Ensure MySQL and the HTTPS proxy also start at boot. If the PM2 daemon loses its process list, `pm2 resurrect` restores its last saved list; it is not a database restore.
+
+After upgrading a version-manager Node installation, follow PM2's [startup instructions](https://pm2.keymetrics.io/docs/usage/startup/) to remove/regenerate the old startup hook with the new paths. Verify the ecosystem interpreter uses Node.js 24 and save the process list again.
+
+### 5. Daily commands and configuration changes
+
+| Task | Command |
+| --- | --- |
+| List managed apps | `pm2 status` |
+| Inspect this app | `pm2 describe operations` |
+| Follow logs | `pm2 logs operations --lines 100` |
+| CPU/memory monitor | `pm2 monit` |
+| Restart | `pm2 restart operations` |
+| Stop temporarily | `pm2 stop operations` |
+| Start after a stop | `pm2 restart operations` |
+| Apply ecosystem/environment changes | `pm2 restart ecosystem.config.cjs --only operations --update-env` |
+| Persist intended process list | `pm2 save` |
+
+Edit `.env` then restart the process to reload it. Node reads that file at each start. Inherited shell/PM2 environment variables take precedence over values in the env file; the ecosystem deliberately supplies production NODE_ENV. Avoid exporting duplicate MYSQL_*, APP_URL or encryption variables in your shell. `--update-env` refreshes PM2's inherited environment; it does not override higher-precedence conflicting variables for you. Do not inspect/share full process environments because they may contain secrets.
+
+Logs normally live in the deployment user's `~/.pm2/logs`. Keep them private and configure retention so the disk does not fill. Optional [PM2 log rotation](https://github.com/keymetrics/pm2-logrotate):
+
+```bash
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 14
+pm2 save
+```
+
+This installs a separate PM2 module, not an application dependency. PM2 guidance: [application configuration](https://pm2.keymetrics.io/docs/usage/application-declaration/) and [process management](https://pm2.keymetrics.io/docs/usage/process-management/).
+
+### 6. Back up and update a PM2 installation
+
+Use the same deployment user and project directory. Pause this app for a coordinated database/document snapshot:
+
+```bash
+cd /srv/operations
+pm2 stop operations
+npm run backup
+pm2 restart operations
+```
+
+Copy the printed backup directory off-server and preserve `.env`/encryption key separately. If backup fails, inspect the error and restore service deliberately; commands are shown separately so failures are visible. Do not run the systemd-specific backup commands when PM2 manages this app.
+
+For an update, take a successful backup first and record the existing commit:
+
+```bash
+cd /srv/operations
+git rev-parse HEAD
+pm2 stop operations
+git pull --ff-only origin main
+npm ci --omit=dev
+npm run db:migrate
+pm2 restart ecosystem.config.cjs --only operations --update-env
+pm2 save
+pm2 logs operations --lines 100
+```
+
+Stop if pull/install/migration fails; investigate before starting incompatible code. Verify HTTPS login, a known document and Settings activity afterward. There is a short maintenance outage; this guide does not promise zero-downtime deployment. Code rollback does not reverse schema changes: follow [Updates and rollback](#updates-and-rollback) and [Backups and recovery](#backups-and-recovery).
+
+### 7. PM2 troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| App repeatedly restarts / errored | Read `pm2 logs operations --lines 100`; check MySQL, encryption key, permissions and Node version. After correcting the cause, restart it. |
+| EADDRINUSE | Another app, native service, Docker container or duplicate PM2 entry owns port 3000. Stop the conflicting Operations process; do not terminate unrelated services. |
+| .env not found | Start the included ecosystem file, check its working directory and ensure the deployment user can read the root .env. |
+| Wrong database/portal after editing .env | Check inherited PM2/shell overrides, use the same Unix user, then restart with the ecosystem configuration. |
+| App missing from pm2 status | Confirm you are the original deployment user, not root or another SSH account. Each PM2 user has a separate process list. |
+| Not restored after reboot | Run generated startup command and pm2 save; inspect the generated systemd service and old Node/version-manager paths. |
+| App online but login fails over HTTP | Production Secure cookies need HTTPS. Configure the proxy and use the HTTPS domain. |
+| Upload/backup permission error | The PM2 user needs write/traverse access to private directories and read access to .env. Do not make private storage public. |
+| Disk fills with logs | Configure logrotate/retention and off-server backup retention. Check free space. |
+
+These commands document Linux PM2 deployment; no PM2 daemon or live server was installed as part of writing the guide.
 
 ## Manual Linux production service
 
