@@ -61,7 +61,7 @@ export async function createCase(c,input,user) {
  if(!applicants.length||applicants.length>20||applicants.some(a=>typeof a.name!=='string'||!a.name.trim()||a.name.length>120))fail('Provide 1–20 named applicants.');
  const category=cats[0], fields=expandFields(normalizeFields(json(category.fields)),applicants);
  const [clientUsers]=await c.execute("SELECT id,role FROM users WHERE email=?",[input.clientEmail.trim().toLowerCase()]);
- if(clientUsers.length&&clientUsers[0].role!=='CLIENT')fail('Client email belongs to a staff account.');
+ if(clientUsers.length&&clientUsers[0].role!=='CLIENT')fail('This email belongs to a staff account. Use the client’s own email address before initiating the file; staff accounts cannot be converted to client logins.',409);
  const [result]=await c.execute('INSERT INTO cases (source_contract_id,ghl_contact_id,client_name,client_email,category_id,requirements_snapshot,category_version,assigned_to,team_id,due_at,opportunity_id,summary_json,applicants,client_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[input.contractId || 'manual:'+randomUUID(),input.contactId || null,input.clientName.trim(),input.clientEmail.trim().toLowerCase(),category.id,JSON.stringify(fields),category.version,assigned?.id || null,teamId,input.dueAt?new Date(input.dueAt):null,input.dossier?null:input.opportunityId || null,JSON.stringify(input.summary || {}),JSON.stringify(applicants),clientUsers[0]?.id || null]);
  for(const f of fields)await c.execute('INSERT INTO requirements (case_id,field_key,definition) VALUES (?,?,?)',[result.insertId,f.key,JSON.stringify(f)]);
  const file=await loadCase(c,result.insertId,null);

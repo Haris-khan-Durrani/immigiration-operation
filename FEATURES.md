@@ -34,3 +34,8 @@ JavaScript syntax checks and security/domain unit tests pass. A separate tempora
 5. Deploy behind HTTPS, set NODE_ENV=production, configure persistent private file/MySQL volumes, and schedule off-host encrypted backups. Docker/TLS deployment has not been run here.
 
 Private local storage is the document source of truth. GHL Media copies are optional; a failed copy does not discard the private original. Category fields belong directly to the selected category; parent fields do not inherit. Multiple document slots are individually reviewed. Optional CRM copies support compression and a selected Media parent folder while retaining originals. Password recovery is administrator-managed. Production operations and external service wiring still require the steps above; the project is not already deployed or connected to the external Contract Manager.
+
+- Client study workspace with right-side portal conversations, private notes and CRM/email controls; responsive layout.
+- Initiated intake entries have an Open file action; source dossiers can be reviewed before initiation.
+- Audited pre-initiation email correction for staff/client email conflicts, without changing staff identities.
+- Category name/parent editing, cycle prevention and confirmed deletion of unused categories; assigned categories/subcategories protect deletion.

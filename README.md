@@ -791,3 +791,11 @@ The browser suite launches Microsoft Edge through Playwright (`channel: msedge`)
 - The deployment commands are based on the repository and linked official documentation. Application unit/MySQL/browser checks have run locally; an actual VPS, DNS/certificate issuance and your real SMTP/CRM services still need verification on the target server.
 
 Dossier handoffs accept all historical dates. The activation date applies only to the legacy summary protocol. A dossier previously excluded solely as Outside activation period can be resent with the same eventId after this update; other duplicate protections remain in place. Historical source data is not automatically fetched: Contract Manager must send or re-share it.
+
+## Client file workspace and category maintenance
+
+New clients includes a Review dossier action before initiation and an Initiated files section with Open file buttons afterward. Initiation opens Client overview with client details, category, owner, progress and source dossier links. Staff can work through Documents, Information, Tasks and Activity while the right-hand Conversations panel stays available. The panel contains client portal messages, email queue/CRM conversation access and a separate Internal notes tab; notes are private to staff. On narrower screens the conversation panel appears below the file content.
+
+If intake email belongs to a staff account, initiation offers a correction step for the actual client email and a mandatory reason. The correction is audited, preserves the original source dossier and never changes the staff account. Corrections are allowed only before initiation. Confirm the address with the client/source counsellor before saving. Existing client logins can be reused for another file.
+
+Administrators and managers can Edit category to change its name/parent. Hierarchy cycles are rejected. Published checklist requirements still use Create new draft, followed by editing/publishing; existing file requirements are preserved. Delete category requires explicit confirmation and is blocked for a category with subcategories or assigned client files. Unused category/template versions are deleted together and the action is audited.
