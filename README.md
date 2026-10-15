@@ -253,7 +253,7 @@ After signing in:
 The existing **Webhooks & Operations Integration Hub** is supported; it does not require the older draft source adapter PR.
 
 1. Open Operations at its actual HTTPS hostname and go to **Settings > Connect your client handoffs**.
-2. Enter the sender's GHL source location ID and activation date. This can differ from the location used for Operations CRM messaging.
+2. Enter the sender's GHL source location ID. This can differ from the location used for Operations CRM messaging.
 3. Generate/copy a shared key and **Save application linking**. Generating alone does not save it.
 4. Click **Copy URL**. The panel supplies your receiving endpoint automatically:
 
@@ -271,7 +271,7 @@ The existing **Webhooks & Operations Integration Hub** is supported; it does not
 | Ready to receive | Local setup is saved; an incoming delivery is still needed to prove reachability. |
 | Receiving dossiers | Intake has been recorded; history is not a continuous uptime monitor. |
 
-The Hub event is `client_dossier.shared_with_operations`. `X-Webhook-Signature` is the hex HMAC-SHA256 digest of the exact raw JSON bytes. Intake checks source location, activation date, completed state and required PDF links. The documented payload has no pipeline/opportunity/new-client flag; explicit sharing authorizes dossier intake. Older summary senders retain their legacy policy.
+The Hub event is `client_dossier.shared_with_operations`. `X-Webhook-Signature` is the hex HMAC-SHA256 digest of the exact raw JSON bytes. Intake checks source location, completed state and required PDF links. The documented payload has no pipeline/opportunity/new-client flag; explicit sharing authorizes dossier intake. Older summary senders retain their legacy policy.
 
 Repeated event IDs and location-scoped contract IDs do not duplicate intake. Policy exclusions/signature failures appear in activity. Signed ping event names supported: `ping`, `webhook.ping`, `test.ping`. If Test Ping sends another format, inspect the response and use a real shared dossier to verify delivery.
 
@@ -769,7 +769,7 @@ The browser suite launches Microsoft Edge through Playwright (`channel: msedge`)
 | Login immediately returns to sign-in | Production Secure cookies require HTTPS. Use development mode only for local HTTP. |
 | 502 Bad Gateway | Check app logs/status and `curl -I http://127.0.0.1:3000/`. Proxy the host loopback port. |
 | Webhook signature rejected | Match keys in both apps. The Hub signs the exact raw JSON with plain hex X-Webhook-Signature. Reformatting after signing breaks verification. |
-| Handoff skipped | Inspect activity reason: source location, activation date, contract state, required PDFs. Excluded event IDs are remembered; after correcting policy use a new eventId to reconsider. Duplicate contracts remain excluded. |
+| Handoff skipped | Inspect activity reason: source location, contract state, required PDFs. Excluded event IDs are remembered; after correcting policy use a new eventId to reconsider. Duplicate contracts remain excluded. |
 | No New clients entry | Click Share with Operations, verify destination/response and server reachability. Live servers cannot reach your localhost. |
 | No client login email | Receipt alone does not send credentials. An agent must select a published category and initiate; enable email and inspect queue/provider status. |
 | SMTP failure | Check port/security, authentication/app password, sender authorization and outbound firewall. Save before testing. |
@@ -789,3 +789,5 @@ The browser suite launches Microsoft Edge through Playwright (`channel: msedge`)
 - Published categories are versioned; existing files retain their assigned checklist snapshot.
 - No clients or default admin credentials are seeded. Migrations create schema/default workflow settings.
 - The deployment commands are based on the repository and linked official documentation. Application unit/MySQL/browser checks have run locally; an actual VPS, DNS/certificate issuance and your real SMTP/CRM services still need verification on the target server.
+
+Dossier handoffs accept all historical dates. The activation date applies only to the legacy summary protocol. A dossier previously excluded solely as Outside activation period can be resent with the same eventId after this update; other duplicate protections remain in place. Historical source data is not automatically fetched: Contract Manager must send or re-share it.

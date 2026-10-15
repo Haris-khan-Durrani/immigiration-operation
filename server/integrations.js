@@ -29,7 +29,7 @@ export async function handoff(req,res) {
  for(const key of ['eventId','contractId','opportunityId','contactId'])if(typeof data[key]!=='string'||!data[key]||data[key].length>120)fail('Invalid '+key);
  const result=await transaction(async c=>{
   const [settings]=await c.query('SELECT settings FROM application_settings WHERE id=1 FOR UPDATE');
-  const [previous]=await c.execute('SELECT * FROM handoff_events WHERE event_id=?',[data.eventId]);if(previous.length)return {duplicate:true,intakeId:previous[0].intake_id,result:previous[0].result};
+  const [previous]=await c.execute('SELECT * FROM handoff_events WHERE event_id=?',[data.eventId]);if(previous.length){const dateExcluded=dossier&&previous[0].result==='Outside activation period'&&!previous[0].intake_id;if(!dateExcluded)return {duplicate:true,intakeId:previous[0].intake_id,result:previous[0].result};await c.execute('DELETE FROM handoff_events WHERE event_id=?',[data.eventId]);}
   const policy=json(settings[0].settings);const reason=dossier?dossierEligibility(data,policy):eligible(data,policy);
   const [existing]=await c.execute('SELECT id FROM contract_intake WHERE contract_id=? OR opportunity_id=?',[data.contractId,data.opportunityId]);
   if(reason||existing.length){const result=reason || 'Duplicate contract or opportunity';await c.execute('INSERT INTO handoff_events (event_id,contract_id,result,intake_id) VALUES (?,?,?,?)',[data.eventId,data.contractId,result,existing[0]?.id || null]);return {skipped:true,result,intakeId:existing[0]?.id};}
