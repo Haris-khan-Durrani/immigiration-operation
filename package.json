@@ -1,0 +1,33 @@
+{
+  "name": "operations-application",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env server/index.js",
+    "check": "node scripts/check.js",
+    "test": "node --test",
+    "db:migrate": "node --env-file=.env server/migrate.js",
+    "admin:create": "node --env-file=.env server/create-admin.js",
+    "test:integration": "node --env-file=.env scripts/run-integration.js",
+    "jobs": "node --env-file=.env server/jobs.js",
+    "backup": "node --env-file=.env scripts/backup.js",
+    "restore": "node --env-file=.env scripts/restore.js",
+    "test:e2e": "node --env-file=.env scripts/run-integration.js --browser",
+    "postinstall": "node scripts/prepare-assets.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "helmet": "^8.1.0",
+    "multer": "^2.4.0",
+    "mysql2": "^3.14.0",
+    "nodemailer": "^10.1.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "smtp-server": "^3.19.22"
+  }
+}

@@ -1,0 +1,10 @@
+import {Router} from 'express';
+import {permit} from './auth.js';
+import {emailSettings,saveEmailSettings,verifySmtp,sendSmtp,validAddress} from './email.js';
+import {fail} from './domain.js';
+export const emailRoutes=Router();
+emailRoutes.use('/settings/email',permit('ADMIN'));
+emailRoutes.get('/settings/email',async(req,res)=>{const c=await emailSettings();res.json({provider:c.provider,enabled:!!c.enabled,host:c.host,port:c.port,security:c.security,authEnabled:!!c.auth_enabled,username:c.username,hasPassword:!!c.password_encrypted,fromEmail:c.from_email,fromName:c.from_name,replyTo:c.reply_to});});
+emailRoutes.put('/settings/email',async(req,res)=>{await saveEmailSettings(req.body,req.user);res.json({saved:true});});
+emailRoutes.post('/settings/email/verify',async(req,res)=>{const c=await emailSettings();if(!c.host)fail('Save SMTP settings first.');await verifySmtp(c);res.json({verified:true,message:'SMTP connection and authentication verified. Send a test email to check your sender configuration.'});});
+emailRoutes.post('/settings/email/test',async(req,res)=>{if(!validAddress(req.body.recipient))fail('Enter a valid test recipient email.');const c=await emailSettings();if(!c.host||!validAddress(c.from_email))fail('Save SMTP settings first.');await sendSmtp(c,{emailTo:req.body.recipient,subject:'Operations SMTP test',message:'Your Operations application successfully submitted this test email through the configured SMTP server.'});res.json({sent:true,message:'Test email accepted by the SMTP server.'});});

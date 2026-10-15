@@ -1,0 +1,6 @@
+.env
+node_modules
+private-uploads
+backups
+.test-uploads-*
+.git

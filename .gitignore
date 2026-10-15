@@ -1,0 +1,35 @@
+# Dependencies and generated browser assets
+node_modules/
+public/vendor/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Private application data and backups
+private-uploads/
+backups/
+.test-uploads-*/
+*.sql.gz
+*.sql.zip
+
+# Test output and generated artifacts
+artifacts/
+coverage/
+playwright-report/
+test-results/
+
+# Logs, caches and editor files
+*.log
+npm-debug.log*
+.cache/
+.tmp/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
