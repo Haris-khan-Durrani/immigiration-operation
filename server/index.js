@@ -15,7 +15,9 @@ import {emailRoutes} from './email-routes.js';
 import {emailSettings} from './email.js';
 import {connectionRoutes} from './connection-routes.js';
 import {contractSecret} from './connection.js';
+import {configureProxy} from './proxy.js';
 export const app=express();
+configureProxy(app);
 app.use(helmet());
 app.use(express.json({limit:'256kb',verify(req,res,buffer){req.rawBody=buffer;}}));
 app.use(express.static(fileURLToPath(new URL('../public',import.meta.url))));
@@ -47,7 +49,7 @@ app.put('/api/settings/workflow',async(req,res)=>{
  if(defaultAgentId){const [rows]=await db.execute("SELECT id FROM users WHERE id=? AND active=1 AND role!='CLIENT'",[Number(defaultAgentId)]);if(!rows.length)fail('Default agent must be active staff.');}
  if(mediaFolderId && (typeof mediaFolderId!=='string'||!/^[a-zA-Z0-9_-]{1,120}$/.test(mediaFolderId)))fail('Invalid GHL Media folder ID.');
  const settings={activationDate:activationDate || null,allowedPipelines,defaultCategoryId:defaultCategoryId || null,defaultAgentId:defaultAgentId || null,ghlMediaCopy:!!ghlMediaCopy,mediaPrivacyVerified:!!mediaPrivacyVerified,compressCopies:!!compressCopies,mediaFolderId:mediaFolderId || null};
- await transaction(async c=>{await c.execute('UPDATE application_settings SET settings=JSON_MERGE_PATCH(settings,CAST(? AS JSON)) WHERE id=1',[JSON.stringify(settings)]);await c.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'WORKFLOW_SETTINGS_UPDATED',JSON.stringify(settings)]);});res.json({saved:true});
+ await transaction(async c=>{await c.execute("UPDATE application_settings SET settings=JSON_MERGE_PATCH(settings,JSON_EXTRACT(?,'$')) WHERE id=1",[JSON.stringify(settings)]);await c.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'WORKFLOW_SETTINGS_UPDATED',JSON.stringify(settings)]);});res.json({saved:true});
 });
 app.get('/api/settings/crm',async(req,res)=>{const [rows]=await db.query('SELECT location_id,updated_at FROM integration_settings WHERE id=1');res.json({locationId:rows[0]?.location_id || '',hasToken:!!rows.length,updatedAt:rows[0]?.updated_at});});
 app.put('/api/settings/crm',async(req,res)=>{
@@ -62,7 +64,7 @@ app.post('/api/settings/crm/test',async(req,res)=>{
  if(!response.ok)return res.status(502).json({error:`CRM returned HTTP ${response.status}. Check location, token and locations.readonly permission.`});res.json({connected:true,message:'Location access verified. Messaging and media permissions are checked when used.'});
 });
 app.use('/api',(req,res)=>res.status(404).json({error:'Endpoint not found.'}));
-app.use((err,req,res,next)=>{if(err.code==='LIMIT_FILE_SIZE')return res.status(413).json({error:'File exceeds the 10 MB upload limit.'});if(err.code==='ER_DUP_ENTRY')return res.status(409).json({error:'This record already exists.'});if(err.status)return res.status(err.status).json({error:err.message});console.error('Request failed:',err.code || err.name);res.status(503).json({error:'Request failed. Check database, storage and CRM configuration.'});});
+app.use((err,req,res,next)=>{if(err.code==='LIMIT_FILE_SIZE')return res.status(413).json({error:'File exceeds the 10 MB upload limit.'});if(err.code==='ER_DUP_ENTRY')return res.status(409).json({error:'This record already exists.'});if(err.status)return res.status(err.status).json({error:err.message});console.error('Request failed:',err.code || err.name,req.method,req.path);if(err.code==='ER_PARSE_ERROR')return res.status(503).json({error:'A database query is incompatible with this server. Update the application and check the database version; see server logs for the failing endpoint.'});res.status(503).json({error:'Request failed. Check database, storage and CRM configuration.'});});
 if(process.env.NODE_ENV!=='test'){
  app.listen(Number(process.env.PORT || 3000),process.env.HOST || '127.0.0.1',()=>console.log('Operations application: http://localhost:'+(process.env.PORT || 3000)));
  let running=false;const timer=setInterval(async()=>{if(running)return;running=true;try{await runJobs();}catch(e){console.error('Maintenance failed:',e.code || e.name);}finally{running=false;}},60000);timer.unref();

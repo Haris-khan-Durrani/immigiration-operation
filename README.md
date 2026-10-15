@@ -197,6 +197,33 @@ curl -I https://operations.example.com/
 
 Open the HTTPS address in a browser. DNS and public ports must work before automatic certificate issuance succeeds.
 
+## Native Nginx reverse proxy
+
+If Nginx and the native Node process run on the same server, use the Node loopback listener. For an installation with `PORT=3010`, add `TRUST_PROXY=loopback` to `.env`, restart Operations and use this location block in the domain's HTTPS virtual host:
+
+```nginx
+location ^~ / {
+    client_max_body_size 12M;
+    proxy_pass http://127.0.0.1:3010;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header Connection "";
+    proxy_connect_timeout 60s;
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+}
+```
+
+Match the upstream port to your `.env`; 3010 is an example for a shared server. Do not proxy to the public IP when Node listens only on 127.0.0.1. Overwrite forwarded headers rather than preserving an untrusted client chain. The loopback setting trusts only local peers; do not use unrestricted `true`. This mode is for a native local proxy, not automatically for Docker bridge addresses or a remote proxy.
+
+Validate with `nginx -t` and reload Nginx only if it succeeds, or use the hosting panel's validation/reload action. Do not change unrelated domains. Details: [Express proxy trust](https://expressjs.com/en/guide/behind-proxies/).
+
+For the existing Docker/Caddy example, keep `TRUST_PROXY=false` and the header-removal configuration. Direct requests with no reverse proxy also use false.
+
 ## First administrator and workspace setup
 
 ```bash
@@ -282,6 +309,7 @@ The running app checks maintenance about once per minute. **Process email queue*
 | NODE_ENV | `production` on live HTTPS for Secure cookies; `development` for local HTTP. |
 | APP_URL | Public portal URL for generated emails unless a saved Operations URL overrides it. Set before initiating files. |
 | HOST / PORT | Native listener, normally 127.0.0.1:3000. Compose overrides inside its container. |
+| TRUST_PROXY | false by default; loopback for a native reverse proxy on the same host with overwritten forwarding headers. Unrestricted true is rejected. |
 | MYSQL_HOST / MYSQL_PORT | Database endpoint. Compose overrides to mysql:3306. |
 | MYSQL_DATABASE / MYSQL_USER / MYSQL_PASSWORD | Existing database/account for native; initialized on first Docker database startup. |
 | MYSQL_ROOT_PASSWORD | Required by Compose MySQL, not used by the application connection. |
@@ -755,7 +783,7 @@ The browser suite launches Microsoft Edge through Playwright (`channel: msedge`)
 ## Deployment limits
 
 - This guide targets one application instance. Multiple app/maintenance workers need coordinated jobs and shared storage before use.
-- Express currently has no trusted-proxy configuration. The example removes X-Forwarded-For to avoid rate-limit proxy validation errors, so users behind the proxy share its request budget. Configure narrowly trusted proxy/IP handling before relying on per-client limits at larger scale.
+- Proxy trust defaults to false. Docker/Caddy's header-removal example shares the proxy request budget. Native same-host Nginx can use TRUST_PROXY=loopback with overwritten forwarding headers for per-client accounting. Remote/container proxy trust requires a separately reviewed configuration; unrestricted true is not allowed.
 - MySQL is required. SQLite/PostgreSQL are not drop-in alternatives.
 - Keep database/document volumes, `.env` and the encryption key across container replacements. GitHub is not a data backup.
 - Published categories are versioned; existing files retain their assigned checklist snapshot.
