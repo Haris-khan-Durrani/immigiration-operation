@@ -62,4 +62,4 @@ export function eligible(event,policy) {
  return null;
 }
 
-export function missingDocumentLabels(requirements,documents){return requirements.filter(r=>{const d=json(r.definition);if(r.waived||!d.required||d.type!=='file'||!applicable(r,requirements))return false;const latest=documents.filter(v=>Number(v.requirement_id)===Number(r.id)).sort((a,b)=>b.version-a.version)[0];return !latest||latest.status==='REJECTED';}).map(r=>json(r.definition).label);}
+export function missingDocumentLabels(requirements,documents){return requirements.filter(r=>{const d=json(r.definition);if(r.waived||!d.required||d.type!=='file'||!applicable(r,requirements))return false;const latest=documents.filter(v=>Number(v.requirement_id)===Number(r.id)).sort((a,b)=>b.version-a.version)[0];return !latest||['REJECTED','REMOVED'].includes(latest.status);}).map(r=>json(r.definition).label);}

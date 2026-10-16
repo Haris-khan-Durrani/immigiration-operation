@@ -13,6 +13,7 @@ try {
   }
   const workflow=await readFile(new URL('../database/workflow.sql',import.meta.url),'utf8');
   for(const statement of workflow.split(';').filter(s=>s.trim())) await db.query(statement);
+  await db.query("ALTER TABLE document_versions MODIFY status ENUM('PENDING','ACCEPTED','REJECTED','REMOVED') NOT NULL DEFAULT 'PENDING'");
   const [storageColumns]=await db.query("SHOW COLUMNS FROM document_versions LIKE 'storage_provider'");
   if(!storageColumns.length)await db.query("ALTER TABLE document_versions ADD storage_provider ENUM('LOCAL','GHL') NOT NULL DEFAULT 'LOCAL'");
   await db.query("ALTER TABLE email_outbox MODIFY status ENUM('QUEUED','SENDING','SENT','FAILED','UNKNOWN','CANCELLED') NOT NULL DEFAULT 'QUEUED'");

@@ -870,3 +870,8 @@ pm2 restart ecosystem.config.cjs --only operations --update-env
 ```
 
 The migration uploads each existing original, downloads it to verify its size and SHA-256, records its GHL reference, then removes its encrypted server original. Failed verification preserves the original. Stop on errors and resolve before restarting migration. An interrupted migration after database commit may leave an unreferenced encrypted file on disk; inspect these before removing them. Existing backup archives are not deleted automatically. New backups include GHL metadata, not GHL document bytes, so restoring a backup requires the referenced GHL media to remain available. Do not delete those files in GHL. Contract Manager dossier links remain externally hosted links.
+
+
+### Removing and replacing uploaded documents
+
+Admins, managers and assigned Operations agents can use **Remove file** on the latest document of an open client file. A reason is required. The stored file is deleted from GHL (or legacy local storage), while the submission record and audit history remain marked Removed. A removed latest version makes the requirement incomplete; an earlier accepted version does not become current again. The client or Operations can upload a replacement, which starts as Pending review. Clients cannot remove files. Closed files must be reopened before changing documents. GHL deletion requires the configured location token with medias.write permission. A previously created backup may still contain legacy originals.

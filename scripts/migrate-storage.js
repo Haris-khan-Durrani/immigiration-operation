@@ -5,7 +5,7 @@ import {uploadMedia,readDocument,readMedia} from '../server/storage.js';
 
 // Stop application writes while migrating. Every original is verified before removal.
 try {
- const [rows]=await db.query("SELECT * FROM document_versions WHERE storage_provider='LOCAL' ORDER BY id");
+ const [rows]=await db.query("SELECT * FROM document_versions WHERE storage_provider='LOCAL' AND status!='REMOVED' ORDER BY id");
  for(const row of rows){
   const bytes=await readDocument(row);
   const media=await uploadMedia(bytes,row.mime,`OPS-migrated-${row.id}-${row.storage_key}`);

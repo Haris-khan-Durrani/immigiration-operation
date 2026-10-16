@@ -6,7 +6,7 @@ export async function crm(path,{method='GET',body,version='2021-07-28'}={}) {
  const {token}=await credentials();let response;
  try {response=await fetch('https://services.leadconnectorhq.com'+path,{method,headers:{Authorization:`Bearer ${token}`,Version:version,Accept:'application/json',...(body && !(body instanceof FormData)?{'Content-Type':'application/json'}:{})},body:body instanceof FormData?body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15000)});}catch{const e=new Error('CRM connection timed out or failed.');e.ambiguous=true;throw e;}
  if(!response.ok){const e=new Error(`CRM returned HTTP ${response.status}. Check connection and required scopes.`);e.providerStatus=response.status;throw e;}
- return response.json();
+ const text=await response.text();return text?JSON.parse(text):{};
 }
 export async function verifyContact(contactId) {const config=await credentials();const result=await crm('/contacts/'+encodeURIComponent(contactId));if(result.contact?.locationId!==config.locationId)fail('CRM contact does not belong to the configured location.',409);return result.contact;}
 export async function sendEmail(contactId,payload) {

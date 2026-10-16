@@ -11,6 +11,6 @@ try {
  await mkdir(directory,{recursive:true});await writeFile(path.join(directory,'database.enc'),encrypt(JSON.stringify(backup)),{mode:0o600});
  await mkdir(path.join(directory,'files'));const source=path.resolve(process.env.UPLOAD_DIR || 'private-uploads');
  // Copy only referenced immutable encrypted documents. Pause writes for a coordinated production backup.
- for(const row of backup.tables.document_versions){if(row.storage_provider==='GHL')continue;if(!/^[a-f0-9-]{36}$/.test(row.storage_key))throw new Error('Invalid document storage key');await copyFile(path.join(source,row.storage_key+'.enc'),path.join(directory,'files',row.storage_key+'.enc'));}
+ for(const row of backup.tables.document_versions){if(row.storage_provider==='GHL'||row.status==='REMOVED')continue;if(!/^[a-f0-9-]{36}$/.test(row.storage_key))throw new Error('Invalid document storage key');await copyFile(path.join(source,row.storage_key+'.enc'),path.join(directory,'files',row.storage_key+'.enc'));}
  await c.commit();console.log('Encrypted backup saved:',directory);
 }catch(e){if(c)await c.rollback();throw e;}finally{c?.release();await db.end();}

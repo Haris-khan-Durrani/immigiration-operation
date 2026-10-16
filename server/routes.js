@@ -1,7 +1,7 @@
 import {Router} from 'express';
 import multer from 'multer';
 import {randomUUID,createHash,randomBytes} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
+import {readFile,unlink} from 'node:fs/promises';
 import path from 'node:path';
 import {db} from './db.js';
 import {hashPassword,verifyPassword,permit,validUser} from './auth.js';
@@ -96,6 +96,7 @@ routes.post('/cases/:id/requirements/:rid/upload',async(req,res,next)=>{await lo
 });
 routes.get('/documents/:id/file',async(req,res)=>{
  const [rows]=await db.execute('SELECT v.*,r.case_id FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE v.id=?',[req.params.id]);if(!rows.length)fail('Document not found.',404);const v=rows[0];await loadCase(db,v.case_id,req.user);
+ if(v.status==='REMOVED')fail('This document was removed.',410);
  const buffer=await readDocument(v);
  await transaction(c=>event(c,v.case_id,req.user,'DOCUMENT_VIEWED',`Document version ${v.id} viewed/downloaded.`));
  res.set({'Content-Type':v.mime,'Content-Disposition':`${req.query.preview==='1'?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(v.original_name)}`,'Content-Security-Policy':"default-src 'none'; sandbox; frame-ancestors 'self'",'Cache-Control':'no-store'});res.send(buffer);
@@ -106,6 +107,21 @@ routes.post('/documents/:id/ghl-copy',staffOnly,async(req,res)=>{
  const original=Buffer.from(decrypt(await readFile(path.join(directory,v.storage_key+'.enc'),'utf8')),'base64');const bytes=policy.compressCopies?await optimize(original,v.mime):original;const body=new FormData();body.set('file',new Blob([bytes],{type:v.mime}),v.original_name);body.set('hosted','false');if(policy.mediaFolderId)body.set('parentId',policy.mediaFolderId);body.set('name',`OPS-${v.case_id}-v${v.version}-${v.original_name}`);
  const result=await crm('/medias/upload-file',{method:'POST',body});if(!result.fileId||!result.url)fail('CRM did not confirm media storage.',502);
  await transaction(async c=>{await loadCase(c,v.case_id,req.user,true);await c.execute('UPDATE document_versions SET ghl_media_id=?,ghl_media_url=? WHERE id=?',[result.fileId,result.url,v.id]);await event(c,v.case_id,req.user,'GHL_MEDIA_COPIED',`Document copied to CRM media storage (${original.length} original bytes; ${bytes.length} copy bytes).`);});res.json({copied:true,compressed:bytes.length<original.length});
+});
+routes.delete('/documents/:id',staffOnly,async(req,res)=>{
+ const reason=req.body.reason;if(typeof reason!=='string'||!reason.trim()||reason.length>1000)fail('Enter a reason for removing this document.');
+ await transaction(async c=>{
+  const [lookup]=await c.execute('SELECT r.case_id FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE v.id=?',[req.params.id]);if(!lookup.length)fail('Document not found.',404);
+  const file=await loadCase(c,lookup[0].case_id,req.user,true);writable(file,req.user);
+  const [rows]=await c.execute('SELECT * FROM document_versions WHERE id=? FOR UPDATE',[req.params.id]);const v=rows[0];
+  if(v.status==='REMOVED')return;
+  const [latest]=await c.execute('SELECT id FROM document_versions WHERE requirement_id=? ORDER BY version DESC LIMIT 1',[v.requirement_id]);if(Number(latest[0].id)!==Number(v.id))fail('Only the latest document can be removed.',409);
+  if(v.ghl_media_id){const config=await credentials();try{await crm('/medias/'+encodeURIComponent(v.ghl_media_id)+'?altType=location&altId='+encodeURIComponent(config.locationId),{method:'DELETE'});}catch(e){if(e.providerStatus!==404)throw e;}}
+  if(v.storage_provider!=='GHL')await unlink(path.join(directory,v.storage_key+'.enc')).catch(e=>{if(e.code!=='ENOENT')throw e;});
+  await c.execute("UPDATE document_versions SET status='REMOVED',reason=?,reviewed_by=?,reviewed_at=NOW() WHERE id=?",[reason.trim(),req.user.id,v.id]);
+  if(file.status==='APPROVED'){await c.execute("UPDATE cases SET status='COLLECTING',approved_at=NULL,approved_by=NULL WHERE id=?",[file.id]);file.status='COLLECTING';}
+  await event(c,file.id,req.user,'DOCUMENT_REMOVED',`Document version ${v.version} removed: ${reason.trim()}`,true);await refresh(c,file,req.user);
+ });res.json({removed:true});
 });
 routes.post('/documents/:id/review',staffOnly,async(req,res)=>{
  const {status,reason}=req.body;if(!['ACCEPTED','REJECTED'].includes(status)||status==='REJECTED'&&(typeof reason!=='string'||!reason.trim()||reason.length>5000))fail('Choose accept/reject; rejection requires a reason.');
