@@ -2,3 +2,5 @@
 html[data-theme=dark] body{background:#142030;color:#a4b5cb}html[data-theme=dark] .toolbar{background:#1d2b3d;border-color:#34485e}html[data-theme=dark] .toolbar button{background:#27394e;border-color:#41546b;color:#c7d5e5}
 
 #image{object-fit:contain;max-height:calc(100vh - 70px);width:auto;max-width:100%}#document{padding:12px}
+
+#document:has(#image:not([hidden])){height:calc(100vh - 38px);display:flex;align-items:center;justify-content:center;padding:14px}#document #image{max-height:100%;max-width:100%;width:auto;height:auto;object-fit:contain}.toolbar{z-index:1}
