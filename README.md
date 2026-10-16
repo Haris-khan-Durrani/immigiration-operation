@@ -920,3 +920,8 @@ The bottom composer offers Email (queued through the configured provider) and Po
 
 
 The conversation tab bar now contains only Client conversation (the combined CRM and Operations thread) and Internal notes. The former separate Emails and CRM history tabs are removed. Use the Email delivery button in the conversation header for outbox search, filters, message details and retries; Back to conversation returns to the combined thread. Older CRM-only links open the combined conversation.
+
+
+### Confirming document storage
+
+The staff document view labels each version Stored in GoHighLevel Media or Legacy server file — migration needed. Verify storage downloads a GHL-stored file in memory and checks its original size and SHA-256, then shows the provider Media ID. It does not create a disk copy. The Operations `/api/documents/:id/file` URL remains an authenticated delivery endpoint for either provider; it is not proof of local disk storage. New GHL uploads preserve the original filename within a name such as OPS-42-v1-Passport.pdf so staff can locate them in Media. Existing uploads retain their previously assigned provider names. A rejected or unconfirmed GHL upload fails without creating a document record or falling back to local disk. Run the documented storage migration to transfer legacy server files.

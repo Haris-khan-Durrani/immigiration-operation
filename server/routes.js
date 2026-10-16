@@ -51,7 +51,7 @@ async function caseDetails(req,res,clientPreview=false){
  const file=await loadCase(db,req.params.id,req.user);
  const [details]=await db.execute('SELECT cat.name AS category_name,u.name AS owner_name FROM cases c LEFT JOIN categories cat ON cat.id=c.category_id LEFT JOIN users u ON u.id=c.assigned_to WHERE c.id=?',[file.id]);Object.assign(file,details[0]);
  const [requirements]=await db.execute('SELECT * FROM requirements WHERE case_id=? ORDER BY id',[file.id]);
- const [documents]=await db.execute('SELECT v.id,v.requirement_id,v.version,v.original_name,v.mime,v.byte_size,v.status,v.reason,v.reviewed_at,v.created_at FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE r.case_id=? ORDER BY v.id DESC',[file.id]);
+ const [documents]=await db.execute('SELECT v.id,v.requirement_id,v.version,v.original_name,v.mime,v.byte_size,v.status,v.reason,v.reviewed_at,v.created_at,v.storage_provider FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE r.case_id=? ORDER BY v.id DESC',[file.id]);
  const [events]=await db.execute('SELECT e.id,e.actor_id,e.action,e.description,e.created_at,u.name AS actor_name,u.role AS actor_role FROM case_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.case_id=?'+((clientPreview||req.user.role==='CLIENT')?' AND client_visible=1':'')+' ORDER BY e.id DESC',[file.id]);
  const [tasks]=(clientPreview||req.user.role==='CLIENT')?[[]]:await db.execute('SELECT t.*,u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id=t.assigned_to WHERE case_id=? ORDER BY t.id DESC',[file.id]);
  const [emails]=(clientPreview||req.user.role==='CLIENT')?[[]]:await db.execute('SELECT id,status,attempts,last_error,created_at,sent_at,next_attempt_at,payload_encrypted FROM email_outbox WHERE case_id=? ORDER BY id DESC',[file.id]);
@@ -89,13 +89,20 @@ routes.post('/cases/:id/requirements/:rid/upload',async(req,res,next)=>{await lo
   const [versions]=await c.execute('SELECT version,status FROM document_versions WHERE requirement_id=? ORDER BY version DESC',[requirement.id]);
   if(versions[0]?.status==='ACCEPTED'&&req.user.role==='CLIENT')fail('This document is already accepted. Ask Operations to request a replacement.',409);
   const mime={pdf:'application/pdf',jpg:'image/jpeg',png:'image/png'}[detected];
-  const media=await uploadMedia(file.buffer,mime,`OPS-${caseFile.id}-${key}.${detected}`);
   const name=path.basename(file.originalname).replace(/[\r\n\x00-\x1f]/g,'').slice(0,240);
+  const media=await uploadMedia(file.buffer,mime,`OPS-${caseFile.id}-v${(versions[0]?.version||0)+1}-${name}`);
   const [result]=await c.execute('INSERT INTO document_versions (requirement_id,version,original_name,storage_key,mime,byte_size,sha256,uploaded_by,storage_provider,ghl_media_id,ghl_media_url) VALUES (?,?,?,?,?,?,?,?,?,?,?)',[requirement.id,(versions[0]?.version || 0)+1,name,key,{pdf:'application/pdf',jpg:'image/jpeg',png:'image/png'}[detected],file.size,createHash('sha256').update(file.buffer).digest('hex'),req.user.id,'GHL',media.fileId,media.url]);
   const e=await event(c,caseFile.id,req.user,'DOCUMENT_UPLOADED',definition.label+' uploaded — pending review.',true);
   await notify(c,caseFile.assigned_to,caseFile.id,`uploaded:${e}`,'Document awaiting review: '+definition.label);await refresh(c,caseFile,req.user);
   return result.insertId;
- });res.status(201).json({uploaded:true});
+ });res.status(201).json({uploaded:true,storageProvider:'GHL'});
+});
+routes.get('/documents/:id/storage',staffOnly,async(req,res)=>{
+ const [rows]=await db.execute('SELECT v.*,r.case_id FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE v.id=?',[req.params.id]);if(!rows.length)fail('Document not found.',404);const document=rows[0];await loadCase(db,document.case_id,req.user);
+ if(document.status==='REMOVED')fail('This file was removed.',410);
+ if(document.storage_provider!=='GHL')return res.json({provider:'LOCAL',verified:false,message:'Legacy server file. Run npm run storage:migrate to move it to GoHighLevel.'});
+ await readDocument(document);
+ res.json({provider:'GHL',verified:true,mediaId:document.ghl_media_id,message:'Downloaded from GoHighLevel and verified against the original size and SHA-256. No disk copy was created.'});
 });
 routes.get('/documents/:id/file',async(req,res)=>{
  const [rows]=await db.execute('SELECT v.*,r.case_id FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE v.id=?',[req.params.id]);if(!rows.length)fail('Document not found.',404);const v=rows[0];await loadCase(db,v.case_id,req.user);

@@ -16,7 +16,7 @@ export async function uploadMedia(bytes,mime,name){
  const policy=json(rows[0]?.settings || {}),body=new FormData();
  body.set('file',new Blob([bytes],{type:mime}),name);body.set('hosted','false');body.set('name',name);
  if(policy.mediaFolderId)body.set('parentId',policy.mediaFolderId);
- const result=await crm('/medias/upload-file',{method:'POST',body});
+ let result;try{result=await crm('/medias/upload-file',{method:'POST',body});}catch(error){if(error.status===409)throw error;fail('GoHighLevel Media did not confirm the upload'+(error.providerStatus?' (HTTP '+error.providerStatus+')':'')+'. No server-storage fallback was used. Check the CRM token and media permissions.',502);}
  if(!result.fileId||!result.url)fail('GHL did not confirm document storage. Please retry.',502);
  mediaUrl(result.url);return result;
 }
