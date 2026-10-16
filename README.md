@@ -901,3 +901,10 @@ Open a client file and choose **Conversations → Emails**. The history shows su
 Use **Expand view** to give conversations the full workspace width; **Back to file** restores the document workspace. The Emails tab includes Compose an email and retries for failed/uncertain deliveries. Uncertain deliveries still require checking the email provider before retrying. Sent means accepted by the provider, not confirmed read or delivered to the inbox. Older sent emails may have no recorded send time; newly sent messages record it. The worker now saves the final reminder message before attempting delivery, so newly processed reminder history reflects its send-time content.
 
 This update requires `npm run db:migrate` before restarting, to add the email send timestamp column. It does not automatically send queued messages; outgoing delivery remains controlled by Email delivery settings.
+
+
+### Page URLs and refresh
+
+Pages now have their own paths, including `/dashboard`, `/new-clients`, `/client-files`, `/categories`, `/file-statuses`, `/team`, `/settings`, `/my-tasks`, `/document-review` and `/activity-log`. A file tab uses `/client-files/42/documents`; selected documents and conversation tabs are stored in the query string. Staff read-only previews use `/client-files/42/client-view/documents`. Category selection uses `/categories/12`.
+
+Refresh restores the selected page, file and tab; browser Back/Forward navigation and bookmarks work. Login resumes the requested page after authentication, subject to normal file/team permissions and mandatory password changes. Explicit logout uses `/login`. URLs contain navigation state only, without passwords, session tokens or email body content. The Express server serves the application shell for recognized page routes; API/asset routes retain their existing behavior. Keep Nginx forwarding these paths to the Operations Node application, as in the reverse-proxy configuration above. No database migration is needed for this routing update.
