@@ -892,3 +892,12 @@ Rich text editor updates require `npm ci --omit=dev` after pulling code. The ins
 ### Client document journey
 
 The client portal and staff read-only client preview show a next-step message based on outstanding uploads, requested corrections, pending reviews and file closure. Upload counts and approval counts are separate: a pending document counts as uploaded and is labelled Under review. A Continue upload / Review changes shortcut selects an outstanding document. Category-wide instructions expand on request. Client document previews load when expanded, and replacement uploads for documents already under review are available under Uploaded the wrong file? Replace it. Operations review controls remain on the staff workspace.
+
+
+### Viewing sent and queued emails
+
+Open a client file and choose **Conversations → Emails**. The history shows subjects, recipients, queued dates, send dates, status and failures, with search and a status filter. View email opens its message body, attempts, next queued attempt, provider reference and any failure. Temporary passwords and activation tokens are masked in this staff view. Clients cannot access staff email history. Access is restricted to the same file/team scope and viewing an email is recorded in the Operations audit log.
+
+Use **Expand view** to give conversations the full workspace width; **Back to file** restores the document workspace. The Emails tab includes Compose an email and retries for failed/uncertain deliveries. Uncertain deliveries still require checking the email provider before retrying. Sent means accepted by the provider, not confirmed read or delivered to the inbox. Older sent emails may have no recorded send time; newly sent messages record it. The worker now saves the final reminder message before attempting delivery, so newly processed reminder history reflects its send-time content.
+
+This update requires `npm run db:migrate` before restarting, to add the email send timestamp column. It does not automatically send queued messages; outgoing delivery remains controlled by Email delivery settings.
