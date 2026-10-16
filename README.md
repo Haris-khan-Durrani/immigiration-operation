@@ -799,3 +799,41 @@ New clients includes a Review dossier action before initiation and an Initiated 
 If intake email belongs to a staff account, initiation offers a correction step for the actual client email and a mandatory reason. The correction is audited, preserves the original source dossier and never changes the staff account. Corrections are allowed only before initiation. Confirm the address with the client/source counsellor before saving. Existing client logins can be reused for another file.
 
 Administrators and managers can Edit category to change its name/parent. Hierarchy cycles are rejected. Published checklist requirements still use Create new draft, followed by editing/publishing; existing file requirements are preserved. Delete category requires explicit confirmation and is blocked for a category with subcategories or assigned client files. Unused category/template versions are deleted together and the action is audited.
+
+## File statuses, reminders and expiry tracking
+
+### Custom operational statuses
+
+Staff can open **File statuses** in the management sidebar to create, rename and delete unused labels, for example Waiting for documents or Appointment booked. Assigned statuses cannot be deleted until files are moved to another status. These labels are separate from the system approval stages (Collecting, Approved, Submitted, Completed) and do not bypass checklist/review controls. Choose a label while initiating a file or change it in **Client file > Reminders & expiry**. The label is also shown in the staff file list and Client overview.
+
+### Document upload reminders
+
+At initiation choose Automatic document reminders: off, hourly, every 6/12 hours, daily, every 2/3 days, weekly, fortnightly or every 30 days. Existing files default to off. The same control is available in Reminders & expiry. A full selected interval passes before the first scheduled check; settings changes restart the schedule.
+
+The existing one-minute maintenance loop checks due schedules and queues emails plus portal notifications for required, applicable document uploads that are missing or whose latest version was rejected. Pending-review/accepted documents, waived requirements and optional documents are excluded. Submitted/completed/cancelled files are excluded from upload reminders. A queued document reminder is rechecked immediately before sending; it is cancelled if uploads no longer need action, the file is closed or reminders are off.
+
+Enable outgoing delivery in Email settings for actual sends. Delivery uses the saved SMTP/GHL provider. An unresolved queued/failed/uncertain reminder prevents repeated copies accumulating while email is paused or failing. Turning reminders off removes queued/failed unsent document reminders. Interrupted/uncertain sends still require provider verification.
+
+### Expiry dates
+
+In **Client file > Reminders & expiry > Add expiry date**, enter a name (passport, visa, permit, etc.), expiry date, alert lead time (0-365 days) and repeat interval (1-90 days). Multiple expiry items can be tracked per file. Alerts begin at the selected lead date, repeat at the selected interval and include one final expiry alert. Client email and portal notifications are queued; the file owner receives an in-app notification. Completed/cancelled files are excluded. Date thresholds follow the database server calendar; date-only values are preserved without timestamp conversion in backup/restore.
+
+Use Remove to stop tracking an item; pending queued/failed expiry emails are removed. To correct an expiry date or alert interval, remove its tracking item and add the corrected item. An unresolved prior alert delays repeat alerts rather than accumulating copies. The system processes schedules while the app is running; it does not create a separate external cron service.
+
+### Conversation panel
+
+Client conversation shows saved portal messages chronologically, with author, message bubbles and timestamps. CRM history loads the latest 50 CRM messages when selected and offers Load older messages for previous pages, using the linked contact and configured location/token; missing permissions/connectivity are shown inline. Internal notes remain private to staff. Email compose and queued/sent/failed delivery records live in the collapsible Email & delivery history section. Refresh conversation loads current messages; this is not a live socket or background CRM mailbox sync.
+
+### Upgrade an existing PM2 installation
+
+This release adds database tables/columns and a cancelled-email state: migrations are required before using it. First take a coordinated backup **using the previous code version**, then update:
+
+```bash
+cd /www/operation/immigiration-operation
+pm2 stop operations
+git pull --ff-only origin main
+npm run db:migrate
+pm2 restart ecosystem.config.cjs --only operations --update-env
+```
+
+If migration fails, inspect the error before starting the updated app. Keep the original encryption key. Docker runs migrations at container startup when rebuilt. Refresh the browser with Ctrl+F5 after updating.

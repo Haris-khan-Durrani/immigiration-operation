@@ -39,3 +39,9 @@ Private local storage is the document source of truth. GHL Media copies are opti
 - Initiated intake entries have an Open file action; source dossiers can be reviewed before initiation.
 - Audited pre-initiation email correction for staff/client email conflicts, without changing staff identities.
 - Category name/parent editing, cycle prevention and confirmed deletion of unused categories; assigned categories/subcategories protect deletion.
+
+- Chronological conversation bubbles with author/time, separate CRM email history and private team notes.
+- Staff-managed operational status labels, assigned per file without changing approval stages.
+- Configurable missing/rejected required-document reminders at initiation and per-file settings, with queue deduplication and send-time rechecks.
+- Multiple expiry tracking items with lead-time/repeat/final alerts, client emails/portal notifications and owner notifications.
+- Backup/restore includes statuses, expiry records and per-file reminder schedules; calendar dates retain date-only values.
