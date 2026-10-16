@@ -2,6 +2,7 @@ FROM node:24-alpine
 WORKDIR /app
 COPY package*.json ./
 COPY scripts/prepare-assets.js ./scripts/prepare-assets.js
+COPY public/richtext-entry.js ./public/richtext-entry.js
 RUN npm ci --omit=dev
 COPY server ./server
 COPY database ./database

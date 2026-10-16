@@ -1,3 +1,4 @@
+import {cleanGuide} from './guidance.js';
 import {randomUUID} from 'node:crypto';
 export function fail(message,status=400) {const e=new Error(message);e.status=status;throw e;}
 export const json=value=>{if(typeof value!=='string')return value;try{return JSON.parse(value);}catch{return value;}};
@@ -8,7 +9,7 @@ export function canAccess(user,c) {
 export function normalizeFields(input) {
  if(!Array.isArray(input)||input.length>100) fail('Provide up to 100 fields.');
  const fields=input.map(f=>{
-  if(!f||typeof f.label!=='string'||!f.label.trim()||f.label.length>200||!['text','email','date','number','file','textarea','dropdown','checkbox','phone','url','radio','heading','paragraph','divider'].includes(f.type)||typeof f.guide!=='string'||f.guide.length>5000||typeof f.required!=='boolean') fail('Invalid field definition.');
+  if(!f||typeof f.label!=='string'||!f.label.trim()||f.label.length>200||!['text','email','date','number','file','textarea','dropdown','checkbox','phone','url','radio','heading','paragraph','divider'].includes(f.type)||typeof f.guide!=='string'||f.guide.length>30000||typeof f.required!=='boolean') fail('Invalid field definition.');
   if(f.instructionRole!==undefined&&(!['introduction','important'].includes(f.instructionRole)||f.type!=='paragraph'||f.condition||f.applicantSpecific))fail('Category instructions must be unconditional paragraph blocks.');
   const key=f.key || randomUUID();if(typeof key!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(key))fail('Invalid field key.');
   const options=f.options || [];if(!Array.isArray(options)||options.length>100||options.some(v=>typeof v!=='string'||v.length>200))fail('Invalid dropdown options.');
@@ -20,7 +21,7 @@ export function normalizeFields(input) {
   for(const limit of [f.min,f.max])if(limit!==undefined&&limit!==null&&limit!==''&&!Number.isFinite(Number(limit)))fail('Invalid numeric limit.');
   if(f.min!==undefined&&f.max!==undefined&&f.min!==''&&f.max!==''&&Number(f.min)>Number(f.max))fail('Minimum must not exceed maximum.');
   if(f.sampleUrl && !/^https:\/\/[^\s]+$/.test(f.sampleUrl))fail('Samples must use HTTPS links.');
-  if(f.section!==undefined&&(typeof f.section!=='string'||f.section.length>160))fail('Section name must be up to 160 characters.');if(f.width!==undefined&&!['full','half'].includes(f.width))fail('Invalid field width.');return {...f,required:['heading','paragraph','divider'].includes(f.type)?false:f.required,key,label:f.label.trim(),options,maxMB,fileCount,formats,applicantSpecific:!!f.applicantSpecific};
+  if(f.section!==undefined&&(typeof f.section!=='string'||f.section.length>160))fail('Section name must be up to 160 characters.');if(f.width!==undefined&&!['full','half'].includes(f.width))fail('Invalid field width.');return {...f,required:['heading','paragraph','divider'].includes(f.type)?false:f.required,key,label:f.label.trim(),guide:cleanGuide(f.guide),options,maxMB,fileCount,formats,applicantSpecific:!!f.applicantSpecific};
  });
  if(new Set(fields.map(f=>f.key)).size!==fields.length)fail('Field keys must be unique.');
  for(const f of fields)if(f.condition && (!fields.some(other=>other.key===f.condition.key && !['file','heading','paragraph','divider'].includes(other.type))||f.condition.key===f.key))fail('Conditional rule must reference a different non-file field.');
