@@ -9,6 +9,7 @@ export function normalizeFields(input) {
  if(!Array.isArray(input)||input.length>100) fail('Provide up to 100 fields.');
  const fields=input.map(f=>{
   if(!f||typeof f.label!=='string'||!f.label.trim()||f.label.length>200||!['text','email','date','number','file','textarea','dropdown','checkbox','phone','url','radio','heading','paragraph','divider'].includes(f.type)||typeof f.guide!=='string'||f.guide.length>5000||typeof f.required!=='boolean') fail('Invalid field definition.');
+  if(f.instructionRole!==undefined&&(!['introduction','important'].includes(f.instructionRole)||f.type!=='paragraph'||f.condition||f.applicantSpecific))fail('Category instructions must be unconditional paragraph blocks.');
   const key=f.key || randomUUID();if(typeof key!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(key))fail('Invalid field key.');
   const options=f.options || [];if(!Array.isArray(options)||options.length>100||options.some(v=>typeof v!=='string'||v.length>200))fail('Invalid dropdown options.');
   if(['dropdown','radio'].includes(f.type)&&!options.length)fail('Dropdown fields need options.');

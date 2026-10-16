@@ -875,3 +875,12 @@ The migration uploads each existing original, downloads it to verify its size an
 ### Removing and replacing uploaded documents
 
 Admins, managers and assigned Operations agents can use **Remove file** on the latest document of an open client file. A reason is required. The stored file is deleted from GHL (or legacy local storage), while the submission record and audit history remain marked Removed. A removed latest version makes the requirement incomplete; an earlier accepted version does not become current again. The client or Operations can upload a replacement, which starts as Pending review. Clients cannot remove files. Closed files must be reopened before changing documents. GHL deletion requires the configured location token with medias.write permission. A previously created backup may still contain legacy originals.
+
+
+### Category instructions in the client portal
+
+In Categories, select a service and choose **Client instructions**. Enter an introduction and important notes; blank bodies hide their respective panels. Use the formatting buttons for headings, bold, bullet lists, numbered steps, HTTPS links and simple tables. Preview formatting inside the editor, then Save instructions. A published category automatically becomes a new draft when edited. Use Preview client checklist, then Publish category when ready. This preview includes upload requirements and instruction blocks; staff information fields remain in the staff workspace.
+
+For document-specific guidance, use the field's Edit option and its formatted Description / instructions editor. Use Design → Section / group title to group related uploads, and the up/down controls to order them. Groups appear in the same saved order as the checklist. Existing condition rules and repeated applicant documents continue to apply.
+
+The client sees the introduction and highlighted notes above the upload checklist, then the selected document’s detailed instructions beside its upload area. Notes are stored as non-required paragraph blocks in category versions and copied into each file’s requirement snapshot. Publishing a revision does not alter existing files. Updating an existing file requires the existing explicit category migration flow; review that migration because it replaces the active checklist. No PDF parsing/import or legal requirements are applied automatically.
