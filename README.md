@@ -887,3 +887,8 @@ The client sees the introduction and highlighted notes above the upload checklis
 
 
 Rich text editor updates require `npm ci --omit=dev` after pulling code. The install prepares locally hosted editor assets; no CDN, subscription or external editor account is required. Docker prepares the same assets during its build. Existing plain-text/Markdown instructions remain readable and are converted into visual content when opened for editing. Rich text is cleaned on save and render, with HTTPS-only links and no embedded images or executable content.
+
+
+### Client document journey
+
+The client portal and staff read-only client preview show a next-step message based on outstanding uploads, requested corrections, pending reviews and file closure. Upload counts and approval counts are separate: a pending document counts as uploaded and is labelled Under review. A Continue upload / Review changes shortcut selects an outstanding document. Category-wide instructions expand on request. Client document previews load when expanded, and replacement uploads for documents already under review are available under Uploaded the wrong file? Replace it. Operations review controls remain on the staff workspace.

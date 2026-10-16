@@ -1,0 +1,23 @@
+function clientDocumentState(data){
+ const rows=data.requirements.filter(r=>r.definition.type==='file'&&!r.waived&&r.applicable);
+ const latest=r=>data.documents.filter(v=>Number(v.requirement_id)===Number(r.id)).sort((a,b)=>b.version-a.version)[0];
+ const required=rows.filter(r=>r.definition.required),counts={uploaded:0,accepted:0,pending:0,corrections:0,missing:0};
+ for(const r of required){const status=latest(r)?.status;if(status&&status!=='REMOVED')counts.uploaded++;if(status==='ACCEPTED')counts.accepted++;else if(status==='PENDING')counts.pending++;else if(status==='REJECTED')counts.corrections++;else counts.missing++;}
+ const next=required.find(r=>latest(r)?.status==='REJECTED')||required.find(r=>!latest(r)||latest(r).status==='REMOVED')||rows.find(r=>latest(r)?.status==='REJECTED')||rows.find(r=>!latest(r)||latest(r).status==='REMOVED');
+ return {...counts,total:required.length,next,closed:['SUBMITTED','COMPLETED','CANCELLED'].includes(data.file.status)};
+}
+function clientDocumentOverview(data){
+ const state=clientDocumentState(data);let title,description;
+ if(state.closed){title=data.file.status==='CANCELLED'?'This application is closed':data.file.status==='COMPLETED'?'Your application is complete':'Your application is being processed';description='You can view your documents and follow updates in the activity log.';}
+ else if(state.corrections){title='A document needs your attention';description='Read the requested changes below and upload a corrected copy.';}
+ else if(state.missing){title='Let’s prepare your documents';description='Read the instructions, then upload the requested documents. Your progress is saved automatically.';}
+ else if(state.pending){title='Your documents have been received';description='Operations is reviewing your documents. No action is needed for the documents under review.';}
+ else if(state.total){title='All required documents are approved';description='You’re up to date. Follow the activity log for the next application update.';}
+ else{title='Your document checklist';description='There are no required uploads right now. Optional documents are listed below when available.';}
+ const percent=state.total?Math.round(state.uploaded/state.total*100):0;
+ return `<section class="client-document-overview" aria-label="Your next step"><div class="client-next-step"><div class="next-step-icon ${state.corrections?'needs-attention':''}" aria-hidden="true">${state.corrections?'!':state.missing?'↑':'✓'}</div><div><span class="eyebrow">YOUR NEXT STEP</span><h2>${esc(title)}</h2><p>${esc(description)}</p></div>${!state.closed&&state.next?`<button class="primary" id="client-next-document">${state.corrections?'Review changes':'Continue upload'} →</button>`:''}</div><div class="client-upload-progress"><div><strong>${state.uploaded} of ${state.total} required documents uploaded</strong><span>${state.accepted} approved · ${state.pending} under review${state.corrections?' · '+state.corrections+' need changes':''}</span></div><progress aria-label="Required documents uploaded" max="100" value="${percent}"></progress></div></section>`;
+}
+function documentBadge(status){if(staff())return badge(status);const text={PENDING:'Under review',ACCEPTED:'Approved',REJECTED:'Changes requested',REMOVED:'Upload needed'};return `<span class="badge ${esc(status.toLowerCase())}">${esc(text[status]||status)}</span>`;}
+function documentPreview(document){return staff()?`<div class="preview"><iframe title="Document preview" src="/preview.html?id=${document.id}"></iframe></div>`:`<details class="client-document-preview" data-preview-toggle><summary><span>View uploaded document<small>${esc(document.original_name)}</small></span><span>Expand preview</span></summary><div class="preview"><iframe title="Document preview" data-preview-src="/preview.html?id=${document.id}"></iframe></div></details>`;}
+
+function clientUploadPanel(html,latest){return !staff()&&latest?.status==='PENDING'?'<details class="client-replacement"><summary>Uploaded the wrong file? Replace it</summary>'+html+'</details>':html;}
