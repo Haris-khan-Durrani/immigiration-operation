@@ -1,7 +1,7 @@
 import {Router} from 'express';
 import multer from 'multer';
 import {randomUUID,createHash,randomBytes} from 'node:crypto';
-import {mkdir,writeFile,readFile,unlink} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {db} from './db.js';
 import {hashPassword,verifyPassword,permit,validUser} from './auth.js';
@@ -12,6 +12,7 @@ import {credentials,crm,verifyContact} from './crm.js';
 import {runJobs} from './jobs.js';
 import {emailSettings} from './email.js';
 import {optimize} from './optimize.js';
+import {uploadMedia,readDocument} from './storage.js';
 import {saveFilePreferences} from './file-management.js';
 export const routes=Router();
 const staffOnly=permit('ADMIN','MANAGER','AGENT'), manage=permit('ADMIN','MANAGER');
@@ -76,25 +77,26 @@ routes.post('/cases/:id/requirements/:rid/upload',async(req,res,next)=>{await lo
  if(!req.file)fail('Choose a file.');const file=req.file;
  const detected=file.buffer.subarray(0,5).toString()==='%PDF-'?'pdf':file.buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))?'png':file.buffer[0]===255&&file.buffer[1]===216&&file.buffer[2]===255?'jpg':null;
  if(!detected)fail('Upload a valid PDF, JPG or PNG file.');
- const key=randomUUID();await mkdir(directory,{recursive:true});const target=path.join(directory,key+'.enc');let persisted=false;
- try{await transaction(async c=>{
+ const key=randomUUID();
+ await transaction(async c=>{
   const caseFile=await loadCase(c,req.params.id,req.user,true);writable(caseFile,req.user);
   const [requirements]=await c.execute('SELECT * FROM requirements WHERE case_id=?',[caseFile.id]);const requirement=requirements.find(r=>String(r.id)===req.params.rid);
   if(!requirement||requirement.waived||!applicable(requirement,requirements)||json(requirement.definition).type!=='file')fail('File requirement is not available.');
   const definition=json(requirement.definition);if(!definition.formats.includes(detected)||file.size>definition.maxMB*1024*1024)fail('File does not meet the format or size requirements.');
   const [versions]=await c.execute('SELECT version,status FROM document_versions WHERE requirement_id=? ORDER BY version DESC',[requirement.id]);
   if(versions[0]?.status==='ACCEPTED'&&req.user.role==='CLIENT')fail('This document is already accepted. Ask Operations to request a replacement.',409);
-  await writeFile(target,encrypt(file.buffer.toString('base64')),{mode:0o600,flag:'wx'});
+  const mime={pdf:'application/pdf',jpg:'image/jpeg',png:'image/png'}[detected];
+  const media=await uploadMedia(file.buffer,mime,`OPS-${caseFile.id}-${key}.${detected}`);
   const name=path.basename(file.originalname).replace(/[\r\n\x00-\x1f]/g,'').slice(0,240);
-  const [result]=await c.execute('INSERT INTO document_versions (requirement_id,version,original_name,storage_key,mime,byte_size,sha256,uploaded_by) VALUES (?,?,?,?,?,?,?,?)',[requirement.id,(versions[0]?.version || 0)+1,name,key,{pdf:'application/pdf',jpg:'image/jpeg',png:'image/png'}[detected],file.size,createHash('sha256').update(file.buffer).digest('hex'),req.user.id]);
+  const [result]=await c.execute('INSERT INTO document_versions (requirement_id,version,original_name,storage_key,mime,byte_size,sha256,uploaded_by,storage_provider,ghl_media_id,ghl_media_url) VALUES (?,?,?,?,?,?,?,?,?,?,?)',[requirement.id,(versions[0]?.version || 0)+1,name,key,{pdf:'application/pdf',jpg:'image/jpeg',png:'image/png'}[detected],file.size,createHash('sha256').update(file.buffer).digest('hex'),req.user.id,'GHL',media.fileId,media.url]);
   const e=await event(c,caseFile.id,req.user,'DOCUMENT_UPLOADED',definition.label+' uploaded — pending review.',true);
   await notify(c,caseFile.assigned_to,caseFile.id,`uploaded:${e}`,'Document awaiting review: '+definition.label);await refresh(c,caseFile,req.user);
   return result.insertId;
- });persisted=true;res.status(201).json({uploaded:true});}finally{if(!persisted)await unlink(target).catch(()=>{});}
+ });res.status(201).json({uploaded:true});
 });
 routes.get('/documents/:id/file',async(req,res)=>{
  const [rows]=await db.execute('SELECT v.*,r.case_id FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE v.id=?',[req.params.id]);if(!rows.length)fail('Document not found.',404);const v=rows[0];await loadCase(db,v.case_id,req.user);
- const buffer=Buffer.from(decrypt(await readFile(path.join(directory,v.storage_key+'.enc'),'utf8')),'base64');
+ const buffer=await readDocument(v);
  await transaction(c=>event(c,v.case_id,req.user,'DOCUMENT_VIEWED',`Document version ${v.id} viewed/downloaded.`));
  res.set({'Content-Type':v.mime,'Content-Disposition':`${req.query.preview==='1'?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(v.original_name)}`,'Content-Security-Policy':"default-src 'none'; sandbox; frame-ancestors 'self'",'Cache-Control':'no-store'});res.send(buffer);
 });

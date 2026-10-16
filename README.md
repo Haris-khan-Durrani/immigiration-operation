@@ -33,7 +33,7 @@ This guide takes a new installation from downloading the code to serving it at `
 5. The client signs in, changes the temporary password and uploads requested documents.
 6. Staff review versions, request corrections, manage tasks/messages and progress the file through manager approval/submission/completion.
 
-Express serves the frontend and API together. No separate frontend build or Redis is needed. MySQL holds records; document originals and email payloads are encrypted. See [FEATURES.md](FEATURES.md).
+Express serves the frontend and API together. No separate frontend build or Redis is needed. MySQL holds records; new document originals are stored in GoHighLevel Media, and email payloads are encrypted. See [FEATURES.md](FEATURES.md).
 
 ## Requirements
 
@@ -246,7 +246,7 @@ After signing in:
 1. Create teams and staff accounts in **Team**.
 2. Create parent/subcategories and field/document requirements in **Categories**, then publish usable categories.
 3. Configure intake and email in **Settings**.
-4. Leave documents in private storage. Optional CRM copies require confirmed GHL media privacy.
+4. Configure the CRM token with medias.write permission for document storage. Optionally choose a GHL Media folder.
 
 ## Connect Contract Manager
 
@@ -378,7 +378,7 @@ Open http://localhost:3000. Ctrl+C stops the process. A live Contract Manager ca
 
 ## Live installation with PM2
 
-PM2 is an alternative to Docker or the manual application systemd service. It keeps the Node process running, restarts it after a crash and can restore it at server boot. You still need MySQL, a domain, HTTPS and persistent private storage. PM2 does not install MySQL, issue certificates, run migrations or configure email for you.
+PM2 is an alternative to Docker or the manual application systemd service. It keeps the Node process running, restarts it after a crash and can restore it at server boot. You still need MySQL, a domain, HTTPS and persistent MySQL storage and configured GoHighLevel Media. PM2 does not install MySQL, issue certificates, run migrations or configure email for you.
 
 The steps below target an Ubuntu VPS. Run application/PM2 commands as the **same non-root deployment user** each time. Only OS installation and the generated boot-service command need sudo. Do not mix `pm2` with `sudo pm2`: they manage different process lists and home directories.
 
@@ -640,7 +640,7 @@ Volumes mysql-data, document-data and backup-data retain database/documents/back
 
 ### Coordinated Docker backup
 
-Backups contain encrypted application tables and referenced encrypted document originals. They do not contain `.env`, the encryption key, TLS/server configuration. Preserve those separately.
+Backups contain encrypted application tables and any remaining legacy server document originals. GHL document bytes are not included; the referenced GHL files must remain available. They do not contain `.env`, the encryption key, TLS/server configuration. Preserve those separately.
 
 Stop the app to pause writes; keep MySQL running. Incoming webhook requests temporarily fail, so the sender must retry according to its behavior.
 
@@ -848,3 +848,25 @@ If migration fails, inspect the error before starting the updated app. Keep the 
 - Access is scope-checked and recorded as CLIENT_VIEW_PREVIEWED under Operations audit using the actual staff identity. No client login/session is created and internal notes, tasks, email queue records and source-only metadata are excluded. Document preview/download uses the staff identity and the existing private document-view audit, not a client login event.
 
 This update adds a status-colour database column. Back up with the previous code, stop the app, pull main, run `npm run db:migrate`, then restart PM2. Preserve the encryption key.
+
+
+### GoHighLevel primary document storage
+
+New document uploads are buffered in memory and uploaded to GoHighLevel Media without writing a document to the Operations disk. Configure Settings → CRM connection with the sub-account location ID and private integration token with `medias.write` permission. Optionally save a Media folder ID in Document storage. Original bytes are preserved; uploads fail if GHL cannot confirm storage, with no local fallback. MySQL stores document metadata, checksums and GHL references. Previews/downloads still require an authorized Operations session and verify the downloaded bytes. GHL media URL access is controlled by GHL; an Operations login does not make the underlying media URL private.
+
+Deploy this update with the schema migration before starting the app:
+
+```bash
+pm2 stop operations
+git pull --ff-only origin main
+npm run db:migrate
+```
+
+Existing files remain readable from their previous encrypted storage until migrated. After saving CRM credentials, stop Operations writes and run:
+
+```bash
+npm run storage:migrate
+pm2 restart ecosystem.config.cjs --only operations --update-env
+```
+
+The migration uploads each existing original, downloads it to verify its size and SHA-256, records its GHL reference, then removes its encrypted server original. Failed verification preserves the original. Stop on errors and resolve before restarting migration. An interrupted migration after database commit may leave an unreferenced encrypted file on disk; inspect these before removing them. Existing backup archives are not deleted automatically. New backups include GHL metadata, not GHL document bytes, so restoring a backup requires the referenced GHL media to remain available. Do not delete those files in GHL. Contract Manager dossier links remain externally hosted links.
