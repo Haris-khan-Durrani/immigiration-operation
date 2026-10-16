@@ -8,10 +8,10 @@ export function canAccess(user,c) {
 export function normalizeFields(input) {
  if(!Array.isArray(input)||input.length>100) fail('Provide up to 100 fields.');
  const fields=input.map(f=>{
-  if(!f||typeof f.label!=='string'||!f.label.trim()||f.label.length>200||!['text','email','date','number','file','textarea','dropdown','checkbox'].includes(f.type)||typeof f.guide!=='string'||f.guide.length>5000||typeof f.required!=='boolean') fail('Invalid field definition.');
+  if(!f||typeof f.label!=='string'||!f.label.trim()||f.label.length>200||!['text','email','date','number','file','textarea','dropdown','checkbox','phone','url','radio','heading','paragraph','divider'].includes(f.type)||typeof f.guide!=='string'||f.guide.length>5000||typeof f.required!=='boolean') fail('Invalid field definition.');
   const key=f.key || randomUUID();if(typeof key!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(key))fail('Invalid field key.');
   const options=f.options || [];if(!Array.isArray(options)||options.length>100||options.some(v=>typeof v!=='string'||v.length>200))fail('Invalid dropdown options.');
-  if(f.type==='dropdown'&&!options.length)fail('Dropdown fields need options.');
+  if(['dropdown','radio'].includes(f.type)&&!options.length)fail('Dropdown fields need options.');
   const maxMB=Number(f.maxMB || 10);if(!Number.isFinite(maxMB)||maxMB<1||maxMB>10)fail('File size must be 1–10 MB.');
   const fileCount=Number(f.fileCount || 1);if(!Number.isInteger(fileCount)||fileCount<1||fileCount>10)fail('Document slots must be 1–10.');
   const formats=f.formats || ['pdf','jpg','png'];if(!Array.isArray(formats)||!formats.length||formats.some(v=>!['pdf','jpg','png'].includes(v)))fail('Supported formats: PDF, JPG and PNG.');
@@ -19,10 +19,10 @@ export function normalizeFields(input) {
   for(const limit of [f.min,f.max])if(limit!==undefined&&limit!==null&&limit!==''&&!Number.isFinite(Number(limit)))fail('Invalid numeric limit.');
   if(f.min!==undefined&&f.max!==undefined&&f.min!==''&&f.max!==''&&Number(f.min)>Number(f.max))fail('Minimum must not exceed maximum.');
   if(f.sampleUrl && !/^https:\/\/[^\s]+$/.test(f.sampleUrl))fail('Samples must use HTTPS links.');
-  return {...f,key,label:f.label.trim(),options,maxMB,fileCount,formats,applicantSpecific:!!f.applicantSpecific};
+  if(f.section!==undefined&&(typeof f.section!=='string'||f.section.length>160))fail('Section name must be up to 160 characters.');if(f.width!==undefined&&!['full','half'].includes(f.width))fail('Invalid field width.');return {...f,required:['heading','paragraph','divider'].includes(f.type)?false:f.required,key,label:f.label.trim(),options,maxMB,fileCount,formats,applicantSpecific:!!f.applicantSpecific};
  });
  if(new Set(fields.map(f=>f.key)).size!==fields.length)fail('Field keys must be unique.');
- for(const f of fields)if(f.condition && (!fields.some(other=>other.key===f.condition.key && other.type!=='file')||f.condition.key===f.key))fail('Conditional rule must reference a different non-file field.');
+ for(const f of fields)if(f.condition && (!fields.some(other=>other.key===f.condition.key && !['file','heading','paragraph','divider'].includes(other.type))||f.condition.key===f.key))fail('Conditional rule must reference a different non-file field.');
  // Reject condition cycles: hidden dependencies must never accidentally satisfy required fields.
  for(const field of fields){const seen=new Set([field.key]);let f=field;while(f.condition){if(seen.has(f.condition.key))fail('Conditional fields contain a cycle.');seen.add(f.condition.key);f=fields.find(v=>v.key===f.condition.key);}}
  return fields;
@@ -39,7 +39,9 @@ export function validValue(d,v) {
  if(typeof v!=='string'||v.length>10000)return false;
  if(d.type==='email')return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
  if(d.type==='date')return /^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v&&(!d.futureOnly||v>=new Date().toISOString().slice(0,10));
- if(d.type==='dropdown')return d.options.includes(v);
+ if(d.type==='url'){try{return new URL(v).protocol==='https:';}catch{return false;}}
+ if(d.type==='phone')return /^[+0-9() .-]{5,40}$/.test(v);
+ if(['dropdown','radio'].includes(d.type))return d.options.includes(v);
  return !!v.trim()||!d.required;
 }
 export function completion(requirements,documents) {

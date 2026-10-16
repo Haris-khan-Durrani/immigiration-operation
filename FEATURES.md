@@ -45,3 +45,8 @@ Private local storage is the document source of truth. GHL Media copies are opti
 - Configurable missing/rejected required-document reminders at initiation and per-file settings, with queue deduplication and send-time rechecks.
 - Multiple expiry tracking items with lead-time/repeat/final alerts, client emails/portal notifications and owner notifications.
 - Backup/restore includes statuses, expiry records and per-file reminder schedules; calendar dates retain date-only values.
+
+- Status colour picker and coloured status chips.
+- Category field sorting, text-only editing with immutable existing types, group titles, full/half widths and client form preview.
+- Phone, HTTPS URL and radio answer fields; heading, paragraph and divider layout blocks.
+- Scoped read-only client view audited to Operations, without client session/login events or exposure of private staff data.

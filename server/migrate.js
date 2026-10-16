@@ -14,6 +14,7 @@ try {
   const workflow=await readFile(new URL('../database/workflow.sql',import.meta.url),'utf8');
   for(const statement of workflow.split(';').filter(s=>s.trim())) await db.query(statement);
   await db.query("ALTER TABLE email_outbox MODIFY status ENUM('QUEUED','SENDING','SENT','FAILED','UNKNOWN','CANCELLED') NOT NULL DEFAULT 'QUEUED'");
+  const [statusColors]=await db.query("SHOW COLUMNS FROM file_statuses LIKE 'color'");if(!statusColors.length)await db.query("ALTER TABLE file_statuses ADD color VARCHAR(7) NOT NULL DEFAULT '#137f75'");
   for(const [table,name,type] of [['users','must_change_password','BOOLEAN NOT NULL DEFAULT FALSE'],['handoff_events','intake_id','BIGINT UNSIGNED NULL']]){const [existing]=await db.query(`SHOW COLUMNS FROM ${table} LIKE ?`,[name]);if(!existing.length)await db.query(`ALTER TABLE ${table} ADD ${name} ${type}`);}
   await db.query("INSERT IGNORE INTO application_settings (id,settings) VALUES (1,JSON_OBJECT('activationDate',NULL,'allowedPipelines',JSON_ARRAY(),'defaultCategoryId',NULL,'defaultAgentId',NULL,'ghlMediaCopy',false,'mediaPrivacyVerified',false))");
   console.log('MySQL schema initialized.');

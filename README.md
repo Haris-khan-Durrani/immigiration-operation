@@ -837,3 +837,14 @@ pm2 restart ecosystem.config.cjs --only operations --update-env
 ```
 
 If migration fails, inspect the error before starting the updated app. Keep the original encryption key. Docker runs migrations at container startup when rebuilt. Refresh the browser with Ctrl+F5 after updating.
+
+## Status colours, category design and client view
+
+- **File statuses:** the create/edit dialog includes a colour picker. The selected colour is shown on status chips in the status list, file list and client overview. Renaming without supplying a colour through the API preserves it.
+- **Categories:** each field has up/down sorting, Edit and Design actions. Edit changes only its label and description; an existing field type cannot be changed through either the UI or API. Add a new field if a different data type is needed. Design sets a section/group title and full/half width. Preview client checklist shows the form arrangement.
+- New field types include Phone number, HTTPS website URL, single-choice radio buttons, section headings, instruction paragraphs and dividers, alongside the existing fields/uploads. Layout blocks do not count as required answers. Information fields use the configured arrangement; document uploads retain the document-review interface with page instructions above it.
+- Editing/reordering/designing a published template creates a new draft. Publish after review. Existing files keep their saved checklist; use the explicit category migration action to apply a published template to an existing file.
+- **Client files > Client view**, or **View as client** inside a file, opens a read-only client view. Staff can inspect documents, saved details, portal messages and client-visible activity without a client password or session switch. Exit client view restores the staff workspace. Uploads, forms and sending messages are disabled in this mode.
+- Access is scope-checked and recorded as CLIENT_VIEW_PREVIEWED under Operations audit using the actual staff identity. No client login/session is created and internal notes, tasks, email queue records and source-only metadata are excluded. Document preview/download uses the staff identity and the existing private document-view audit, not a client login event.
+
+This update adds a status-colour database column. Back up with the previous code, stop the app, pull main, run `npm run db:migrate`, then restart PM2. Preserve the encryption key.
