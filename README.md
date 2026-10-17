@@ -946,3 +946,7 @@ Every staff page shows a compact, collapsed task strip only when the signed-in u
 Required fields and required documents both count in application completion. A submitted answer stays pending until Operations accepts it from the file’s **Information** tab. Use **Request correction** to reject an answer with a reason, visible beside the client’s field and in client activity. Clients save revised answers from **Application details** beside uploads. Editing an accepted answer resets it to pending and lowers completion until accepted again; unchanged accepted answers remain accepted. Optional, waived and inapplicable fields do not lower completion. Staff client preview remains read only.
 
 Run `npm run db:migrate` before restarting after this update. The migration preserves existing saved answers as accepted, matching the previous behavior; new and changed answers require review. Existing published/client checklist versions remain unchanged.
+
+### File review queue
+
+**File review** combines pending field answers and the latest pending document uploads for files you can access. Choose **Review** to open the relevant answer in Information or the selected document. Accept or request correction there; reviewed items leave the queue until a new answer or upload is submitted. Blank, invalid, waived, hidden and closed-file items are excluded. The dashboard File review count includes both item types. The page URL is `/file-review`; old `/document-review` links still work.

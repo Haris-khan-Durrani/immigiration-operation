@@ -22,7 +22,7 @@ configureProxy(app);
 app.use(helmet());
 app.use(express.json({limit:'256kb',verify(req,res,buffer){req.rawBody=buffer;}}));
 app.use(express.static(fileURLToPath(new URL('../public',import.meta.url))));
-app.get(/^\/(?:login|dashboard|new-clients|document-review|my-tasks|file-statuses|team|settings|activity-log|notifications|account|categories(?:\/\d+)?|client-files(?:\/\d+(?:\/client-view)?(?:\/(?:overview|tracking|documents|information|tasks|activity))?)?)\/?$/,(_req,res)=>{res.set('Cache-Control','no-store');res.sendFile(fileURLToPath(new URL('../public/index.html',import.meta.url)));});
+app.get(/^\/(?:login|dashboard|new-clients|file-review|document-review|my-tasks|file-statuses|team|settings|activity-log|notifications|account|categories(?:\/\d+)?|client-files(?:\/\d+(?:\/client-view)?(?:\/(?:overview|tracking|documents|information|tasks|activity))?)?)\/?$/,(_req,res)=>{res.set('Cache-Control','no-store');res.sendFile(fileURLToPath(new URL('../public/index.html',import.meta.url)));});
 app.use('/api',rateLimit({windowMs:60000,limit:180,message:{error:'Too many requests. Please wait a minute and try again.'}}));
 app.post('/api/integrations/contracts/events',async(req,res,next)=>{try{await handoff(req,res);}catch(error){try{await db.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',['contract-manager','CONTRACT_WEBHOOK_REJECTED',JSON.stringify({message:error.status&&error.status<500?error.message:'Receiver unavailable; check server configuration.'})]);}catch{}next(error);}});
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');if(!['GET','HEAD'].includes(req.method)&&req.headers['x-ops-request']!=='1')return res.status(403).json({error:'Invalid application request.'});next();});
