@@ -13,6 +13,8 @@ try {
   }
   const workflow=await readFile(new URL('../database/workflow.sql',import.meta.url),'utf8');
   for(const statement of workflow.split(';').filter(s=>s.trim())) await db.query(statement);
+  const [fieldReviewColumns]=await db.query("SHOW COLUMNS FROM requirements LIKE 'value_status'");
+  if(!fieldReviewColumns.length){await db.query("ALTER TABLE requirements ADD value_status ENUM('PENDING','ACCEPTED','REJECTED') NOT NULL DEFAULT 'PENDING', ADD value_reason TEXT NULL, ADD value_revision INT NOT NULL DEFAULT 0, ADD value_reviewed_by BIGINT UNSIGNED NULL, ADD value_reviewed_at DATETIME NULL");await db.query("UPDATE requirements SET value_status='ACCEPTED' WHERE value_json IS NOT NULL AND JSON_TYPE(value_json)!='NULL'");}
   await db.query("ALTER TABLE document_versions MODIFY status ENUM('PENDING','ACCEPTED','REJECTED','REMOVED') NOT NULL DEFAULT 'PENDING'");
   const [emailSentColumns]=await db.query("SHOW COLUMNS FROM email_outbox LIKE 'sent_at'");if(!emailSentColumns.length)await db.query('ALTER TABLE email_outbox ADD sent_at DATETIME NULL');
   const [storageColumns]=await db.query("SHOW COLUMNS FROM document_versions LIKE 'storage_provider'");

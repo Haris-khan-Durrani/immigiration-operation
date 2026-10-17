@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {completion} from '../server/domain.js';
 import {readFile} from 'node:fs/promises';
 const context=vm.createContext({esc:v=>String(v)});
 vm.runInContext(await readFile(new URL('../public/client-documents.js',import.meta.url),'utf8'),context);
 const requirement={id:1,definition:{type:'file',required:true},applicable:true,waived:false};
-const data=documents=>({file:{status:'COLLECTING'},requirements:[requirement],documents});
+const data=documents=>({file:{status:'COLLECTING'},requirements:[requirement],documents,progress:completion([requirement],documents)});
 test('client upload progress distinguishes receipt from approval',()=>{
  const input=data([{requirement_id:1,version:1,status:'PENDING'}]),state=context.clientDocumentState(input);
  assert.equal(state.uploaded,1);assert.equal(state.accepted,0);assert.equal(state.pending,1);assert.equal(state.next,undefined);
- const html=context.clientDocumentOverview(input);assert.ok(html.includes('Your documents have been received'));assert.ok(html.includes('1 of 1 required documents uploaded'));assert.ok(!html.includes('0% complete'));
+ const html=context.clientDocumentOverview(input);assert.ok(html.includes('Your documents have been received'));assert.ok(html.includes('1 of 1 required documents uploaded'));assert.ok(html.includes('0% application complete'));assert.ok(html.includes('0 of 1 required fields and documents accepted'));
 });
 test('corrections and missing documents drive the next client step using latest versions',()=>{
  const input=data([{requirement_id:1,version:2,status:'REJECTED'},{requirement_id:1,version:1,status:'ACCEPTED'}]);
@@ -21,3 +22,5 @@ test('optional, waived and hidden requirements do not block required upload prog
  const state=context.clientDocumentState(input);assert.equal(state.total,0);assert.equal(state.missing,0);assert.equal(state.next.id,3);
  input.file.status='COMPLETED';assert.ok(!context.clientDocumentOverview(input).includes('id="client-next-document"'));
 });
+
+test('client progress includes required answers and shows field correction feedback',()=>{const input=data([{requirement_id:1,version:1,status:'ACCEPTED'}]);input.requirements.push({id:2,definition:{type:'text',required:true},applicable:true,value_json:'Client',value_status:'REJECTED'});input.progress=completion(input.requirements,input.documents);const html=context.clientDocumentOverview(input);assert.ok(html.includes('50% application complete'));assert.ok(html.includes('1 of 2 required fields and documents accepted'));assert.ok(html.includes('Your application details need a correction'));});

@@ -49,7 +49,7 @@ export function validValue(d,v) {
 export function completion(requirements,documents) {
  const required=requirements.filter(r=>json(r.definition).required&&!r.waived&&applicable(r,requirements));
  const satisfied=required.filter(r=>{
-  const d=json(r.definition);if(d.type!=='file')return validValue(d,json(r.value_json));
+  const d=json(r.definition);if(d.type!=='file')return validValue(d,json(r.value_json))&&(!r.value_status||r.value_status==='ACCEPTED');
   const versions=documents.filter(v=>Number(v.requirement_id)===Number(r.id)).sort((a,b)=>b.version-a.version);
   return versions[0]?.status==='ACCEPTED';
  });
