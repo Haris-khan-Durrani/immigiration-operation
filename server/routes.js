@@ -66,23 +66,30 @@ async function caseDetails(req,res,clientPreview=false){
  const safeFile={id:file.id,client_user_id:file.client_user_id,client_name:file.client_name,status:file.status,due_at:file.due_at,category_version:file.category_version,applicants:json(file.applicants),approved_at:file.approved_at};
  res.json({categoryInstructions,instructionsVersion:publishedGuides[0]?.version || file.category_version,expiries,file:(clientPreview||req.user.role==='CLIENT')?safeFile:{...file,summary_json:json(file.summary_json)},requirements:requirements.map(r=>({...r,definition:json(r.definition),value_json:json(r.value_json),applicable:applicable(r,requirements)})),documents,events,tasks,emails,progress:completion(requirements,documents)});
 }
-routes.delete('/cases/:id',staffOnly,rateLimit({windowMs:15*60000,limit:10,message:{error:'Too many deletion attempts. Please try again in 15 minutes.'}}),async(req,res)=>{
+const deleteApprovalLimit=rateLimit({windowMs:15*60000,limit:10,message:{error:'Too many deletion attempts. Please try again in 15 minutes.'}});
+routes.post('/cases/:id/delete-approval',staffOnly,deleteApprovalLimit,async(req,res)=>{
  const {adminEmail,adminPassword,reason,confirm}=req.body;
  if(confirm!==true||typeof adminEmail!=='string'||adminEmail.length>254||typeof adminPassword!=='string'||!adminPassword||adminPassword.length>128||typeof reason!=='string'||!reason.trim()||reason.length>1000)fail('Enter administrator email, administrator password and a deletion reason.');
  await loadCase(db,req.params.id,req.user);
  const [admins]=await db.execute("SELECT id,email,password_hash FROM users WHERE email=? AND role='ADMIN' AND active=1 AND must_change_password=0",[adminEmail.trim().toLowerCase()]);
  const valid=await verifyPassword(adminPassword,admins[0]?.password_hash||'00'.repeat(16)+':'+ '00'.repeat(64));
  if(!valid||!admins.length){await db.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'CASE_DELETE_DENIED',JSON.stringify({caseId:req.params.id})]);fail('Valid active administrator credentials are required. Operations passwords cannot authorize deletion.',403);}
+ const now=Date.now();res.json({approval:encrypt(JSON.stringify({purpose:'DELETE_CASE',actorId:req.user.id,caseId:String(req.params.id),adminId:admins[0].id,adminHash:createHash('sha256').update(admins[0].password_hash).digest('hex'),reason:reason.trim(),notBefore:now+5000,expires:now+120000})),waitSeconds:5});
+});
+routes.delete('/cases/:id',staffOnly,async(req,res)=>{
+ let approval;try{if(typeof req.body.approval!=='string'||req.body.approval.length>10000)throw Error();approval=JSON.parse(decrypt(req.body.approval));}catch{fail('Verify administrator credentials before deleting this file.',403);}
+ if(req.body.confirm!==true||approval.purpose!=='DELETE_CASE'||approval.actorId!==req.user.id||approval.caseId!==String(req.params.id)||Date.now()>approval.expires)fail('Deletion authorization is invalid or expired. Verify credentials again.',403);
+ if(Date.now()<approval.notBefore)fail('Wait the full five seconds before permanently deleting this file.',409);
  await transaction(async c=>{
   const file=await loadCase(c,req.params.id,req.user,true);
-  const [currentAdmin]=await c.execute("SELECT id FROM users WHERE id=? AND role='ADMIN' AND active=1 AND must_change_password=0 AND password_hash=? FOR UPDATE",[admins[0].id,admins[0].password_hash]);if(!currentAdmin.length)fail('Administrator authorization changed. Please try again.',403);
+  const [admins]=await c.execute("SELECT id,email,password_hash FROM users WHERE id=? AND role='ADMIN' AND active=1 AND must_change_password=0 FOR UPDATE",[approval.adminId]);if(!admins.length||createHash('sha256').update(admins[0].password_hash).digest('hex')!==approval.adminHash)fail('Administrator authorization changed. Verify credentials again.',403);
   const [sending]=await c.execute("SELECT id FROM email_outbox WHERE case_id=? AND status='SENDING' LIMIT 1 FOR UPDATE",[file.id]);if(sending.length)fail('An email is currently sending. Try again after delivery finishes.',409);
-  await c.execute("UPDATE cases SET status='DELETED',reminder_every_hours=NULL,next_reminder_at=NULL WHERE id=?",[file.id]);
-  await c.execute("UPDATE email_outbox SET status='CANCELLED',last_error='Client file deleted.' WHERE case_id=? AND status IN ('QUEUED','FAILED','UNKNOWN')",[file.id]);
-  await c.execute('UPDATE case_expiries SET next_notice_at=NULL WHERE case_id=?',[file.id]);
-  await c.execute('DELETE FROM invitations WHERE case_id=?',[file.id]);
-  await event(c,file.id,req.user,'CASE_DELETED',reason.trim());
-  await c.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'CASE_DELETED',JSON.stringify({caseId:file.id,clientName:file.client_name,authorizedBy:admins[0].email,reason:reason.trim(),retainedForAudit:true})]);
+  await c.execute('DELETE FROM notifications WHERE case_id=?',[file.id]);
+  await c.execute('DELETE FROM handoff_events WHERE case_id=? OR contract_id=?',[file.id,file.source_contract_id]);
+  await c.execute('DELETE FROM contract_intake WHERE case_id=?',[file.id]);
+  // Foreign-key cascades remove requirements, documents, events, tasks, emails, invitations and expiries.
+  await c.execute('DELETE FROM cases WHERE id=?',[file.id]);
+  await c.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'CASE_DELETED',JSON.stringify({caseId:file.id,authorizedBy:admins[0].email,reason:approval.reason,permanent:true})]);
  });res.json({deleted:true});
 });
 routes.get('/cases/:id',async(req,res)=>caseDetails(req,res));
