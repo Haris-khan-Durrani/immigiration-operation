@@ -7,7 +7,7 @@ import {portalBase} from './connection.js';
 export async function transaction(callback) {const c=await db.getConnection();try{await c.beginTransaction();const result=await callback(c);await c.commit();return result;}catch(e){await c.rollback();throw e;}finally{c.release();}}
 export async function loadCase(c,id,user,lock=false) {
  const [rows]=await c.execute('SELECT * FROM cases WHERE id=?'+(lock?' FOR UPDATE':''),[id]);
- if(!rows.length)fail('Client file not found.',404);
+ if(!rows.length||rows[0].status==='DELETED')fail('Client file not found.',404);
  if(user && !canAccess(user,rows[0]))fail('You do not have access to this client file.',403);
  return rows[0];
 }

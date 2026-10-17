@@ -1,3 +1,4 @@
+import {rateLimit} from 'express-rate-limit';
 import {Router} from 'express';
 import multer from 'multer';
 import {randomUUID,createHash,randomBytes} from 'node:crypto';
@@ -18,7 +19,8 @@ export const routes=Router();
 const staffOnly=permit('ADMIN','MANAGER','AGENT'), manage=permit('ADMIN','MANAGER');
 const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:10*1024*1024,files:1,fields:0}});
 const directory=path.resolve(process.env.UPLOAD_DIR || 'private-uploads');
-function scope(user,alias='c') {if(user.role==='ADMIN')return ['1=1',[]];if(user.role==='MANAGER')return [`${alias}.team_id=?`,[user.team_id || 0]];if(user.role==='CLIENT')return [`${alias}.client_user_id=?`,[user.id]];return [`${alias}.assigned_to=?`,[user.id]];}
+function scope(user,alias='c') {const [where,args]=accessScope(user,alias);return [`${alias}.status!='DELETED' AND (${where})`,args];}
+function accessScope(user,alias='c') {if(user.role==='ADMIN')return ['1=1',[]];if(user.role==='MANAGER')return [`${alias}.team_id=?`,[user.team_id || 0]];if(user.role==='CLIENT')return [`${alias}.client_user_id=?`,[user.id]];return [`${alias}.assigned_to=?`,[user.id]];}
 async function assignee(c,id,file,user) {const [rows]=await c.execute("SELECT id,team_id FROM users WHERE id=? AND active=1 AND role IN ('ADMIN','MANAGER','AGENT')",[Number(id)||0]);if(!rows.length)fail('Select an active staff user.');if(user.role==='MANAGER'&&Number(rows[0].team_id)!==Number(user.team_id))fail('Select staff within your team.',403);return rows[0];}
 function writable(file,user) {if(['COMPLETED','SUBMITTED','CANCELLED'].includes(file.status))fail('This file is closed for collection. Reopen it before changing requirements.',409);}
 routes.get('/staff',staffOnly,async(req,res)=>{const [users]=await db.execute("SELECT id,name,role,team_id FROM users WHERE active=1 AND role!='CLIENT'"+(req.user.role==='ADMIN'?'':' AND (team_id=? OR id=?)'),req.user.role==='ADMIN'?[]:[req.user.team_id || 0,req.user.id]);res.json(users);});
@@ -64,6 +66,25 @@ async function caseDetails(req,res,clientPreview=false){
  const safeFile={id:file.id,client_user_id:file.client_user_id,client_name:file.client_name,status:file.status,due_at:file.due_at,category_version:file.category_version,applicants:json(file.applicants),approved_at:file.approved_at};
  res.json({categoryInstructions,instructionsVersion:publishedGuides[0]?.version || file.category_version,expiries,file:(clientPreview||req.user.role==='CLIENT')?safeFile:{...file,summary_json:json(file.summary_json)},requirements:requirements.map(r=>({...r,definition:json(r.definition),value_json:json(r.value_json),applicable:applicable(r,requirements)})),documents,events,tasks,emails,progress:completion(requirements,documents)});
 }
+routes.delete('/cases/:id',staffOnly,rateLimit({windowMs:15*60000,limit:10,message:{error:'Too many deletion attempts. Please try again in 15 minutes.'}}),async(req,res)=>{
+ const {adminEmail,adminPassword,reason,confirm}=req.body;
+ if(confirm!==true||typeof adminEmail!=='string'||adminEmail.length>254||typeof adminPassword!=='string'||!adminPassword||adminPassword.length>128||typeof reason!=='string'||!reason.trim()||reason.length>1000)fail('Enter administrator email, administrator password and a deletion reason.');
+ await loadCase(db,req.params.id,req.user);
+ const [admins]=await db.execute("SELECT id,email,password_hash FROM users WHERE email=? AND role='ADMIN' AND active=1 AND must_change_password=0",[adminEmail.trim().toLowerCase()]);
+ const valid=await verifyPassword(adminPassword,admins[0]?.password_hash||'00'.repeat(16)+':'+ '00'.repeat(64));
+ if(!valid||!admins.length){await db.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'CASE_DELETE_DENIED',JSON.stringify({caseId:req.params.id})]);fail('Valid active administrator credentials are required. Operations passwords cannot authorize deletion.',403);}
+ await transaction(async c=>{
+  const file=await loadCase(c,req.params.id,req.user,true);
+  const [currentAdmin]=await c.execute("SELECT id FROM users WHERE id=? AND role='ADMIN' AND active=1 AND must_change_password=0 AND password_hash=? FOR UPDATE",[admins[0].id,admins[0].password_hash]);if(!currentAdmin.length)fail('Administrator authorization changed. Please try again.',403);
+  const [sending]=await c.execute("SELECT id FROM email_outbox WHERE case_id=? AND status='SENDING' LIMIT 1 FOR UPDATE",[file.id]);if(sending.length)fail('An email is currently sending. Try again after delivery finishes.',409);
+  await c.execute("UPDATE cases SET status='DELETED',reminder_every_hours=NULL,next_reminder_at=NULL WHERE id=?",[file.id]);
+  await c.execute("UPDATE email_outbox SET status='CANCELLED',last_error='Client file deleted.' WHERE case_id=? AND status IN ('QUEUED','FAILED','UNKNOWN')",[file.id]);
+  await c.execute('UPDATE case_expiries SET next_notice_at=NULL WHERE case_id=?',[file.id]);
+  await c.execute('DELETE FROM invitations WHERE case_id=?',[file.id]);
+  await event(c,file.id,req.user,'CASE_DELETED',reason.trim());
+  await c.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'CASE_DELETED',JSON.stringify({caseId:file.id,clientName:file.client_name,authorizedBy:admins[0].email,reason:reason.trim(),retainedForAudit:true})]);
+ });res.json({deleted:true});
+});
 routes.get('/cases/:id',async(req,res)=>caseDetails(req,res));
 routes.get('/cases/:id/client-preview',staffOnly,async(req,res)=>{await loadCase(db,req.params.id,req.user);await db.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[req.user.email,'CLIENT_VIEW_PREVIEWED',JSON.stringify({caseId:req.params.id,mode:'READ_ONLY'})]);await caseDetails(req,res,true);});
 routes.post('/cases/:id/invite',manage,async(req,res)=>{const url=await transaction(async c=>{const file=await loadCase(c,req.params.id,req.user,true);return invite(c,file,req.user);});res.json({url});});

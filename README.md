@@ -928,3 +928,9 @@ The staff document view labels each version Stored in GoHighLevel Media or Legac
 
 
 Client files now includes a Completion column with percentage, progress bar and completed/required counts. Staff completion uses the same checklist rules as the file detail: accepted latest document versions and valid required answers count, while optional, waived and non-applicable requirements do not block completion. Client list completion counts their applicable required documents only. Values are calculated from current requirements and document review states without a separate stored percentage. Category action colours distinguish delete/remove (red), edit (blue), design (purple) and instructions/preview (teal).
+
+### Delete a client file
+
+In **Client files**, choose the red **Delete** button. Enter an active administrator’s email and password, plus a reason. An Operations or manager password cannot approve deletion. Staff can only request deletion for files they can access. Approval attempts are rate limited.
+
+Deletion removes the file from active lists and the client portal, cancels pending emails and reminders, and records the requesting user, approving administrator and reason in the application activity log. Records and GHL Media documents are retained for audit history; this is a logical deletion, not a media purge. Previously sent emails cannot be recalled. A file with an email currently sending must be retried after delivery finishes.
