@@ -6,6 +6,9 @@ import {portalBase} from './connection.js';
 import {transaction,notify,queueEmail} from './workflow.js';
 export async function runJobs({send}={}) {
  await db.query('DELETE FROM sessions WHERE expires_at<NOW()');
+ await db.query('DELETE FROM notifications WHERE created_at<DATE_SUB(NOW(),INTERVAL 30 DAY)');
+ await db.query("DELETE n FROM notifications n JOIN tasks t ON n.event_key=CONCAT('task:',t.id) OR n.event_key=CONCAT('overdue-task:',t.id) WHERE t.status='DONE'");
+ await db.query("DELETE FROM tasks WHERE status='DONE'");
  await transaction(async c=>{
   const [tasks]=await c.query("SELECT t.* FROM tasks t JOIN cases c ON c.id=t.case_id WHERE t.status='OPEN' AND t.due_at<NOW() AND c.status!='DELETED'");
   for(const t of tasks)await notify(c,t.assigned_to,t.case_id,`overdue-task:${t.id}`,'Task overdue: '+t.title);
