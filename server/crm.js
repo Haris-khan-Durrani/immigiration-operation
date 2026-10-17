@@ -11,5 +11,5 @@ export async function crm(path,{method='GET',body,version='2021-07-28'}={}) {
 export async function verifyContact(contactId) {const config=await credentials();const result=await crm('/contacts/'+encodeURIComponent(contactId));if(result.contact?.locationId!==config.locationId)fail('CRM contact does not belong to the configured location.',409);return result.contact;}
 export async function sendEmail(contactId,payload) {
  await verifyContact(contactId);
- return crm('/conversations/messages',{method:'POST',body:{type:'Email',contactId,subject:payload.subject,message:payload.message,html:'<p>'+payload.message.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])).replace(/\n/g,'<br>')+'</p>',...(payload.emailTo?{emailTo:payload.emailTo}:{})}});
+ return crm('/conversations/messages',{method:'POST',body:{type:'Email',contactId,subject:payload.subject,message:payload.message,html:payload.html||'<p>'+payload.message.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])).replace(/\n/g,'<br>')+'</p>',...(payload.attachments?.length?{attachments:payload.attachments.map(a=>a.url)}:{}),...(payload.emailTo?{emailTo:payload.emailTo}:{})}});
 }

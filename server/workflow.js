@@ -21,9 +21,9 @@ export async function managers(c,caseId,key,description) {
  const [users]=await c.execute("SELECT u.id FROM users u JOIN cases c ON c.id=? WHERE u.active=1 AND (u.role='ADMIN' OR (u.role='MANAGER' AND u.team_id=c.team_id))",[caseId]);
  for(const u of users)await notify(c,u.id,caseId,key,description);
 }
-export async function queueEmail(c,file,key,subject,message) {
+export async function queueEmail(c,file,key,subject,message,content={}) {
  const [settings]=await c.execute('SELECT client_notifications_enabled FROM cases WHERE id=?',[file.id]);if(settings[0]?.client_notifications_enabled===0)return false;
- await c.execute('INSERT IGNORE INTO email_outbox (case_id,recipient_contact_id,payload_encrypted,event_key) VALUES (?,?,?,?)',[file.id,file.ghl_contact_id || null,encrypt(JSON.stringify({subject,message,emailTo:file.client_email})),key]);
+ await c.execute('INSERT IGNORE INTO email_outbox (case_id,recipient_contact_id,payload_encrypted,event_key) VALUES (?,?,?,?)',[file.id,file.ghl_contact_id || null,encrypt(JSON.stringify({subject,message,emailTo:file.client_email,...content})),key]);
 }
 export async function refresh(c,file,user) {
  const [requirements]=await c.execute('SELECT * FROM requirements WHERE case_id=?',[file.id]);
