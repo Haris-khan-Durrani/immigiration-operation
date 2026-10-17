@@ -16,12 +16,13 @@ export async function event(c,caseId,user,action,description,visible=false) {
  await c.execute('INSERT INTO audit_events (actor,action,details) VALUES (?,?,?)',[user?.email || 'contract-integration',action,JSON.stringify({caseId,eventId:result.insertId})]);
  return result.insertId;
 }
-export async function notify(c,userId,caseId,key,description) {if(userId)await c.execute('INSERT IGNORE INTO notifications (user_id,case_id,event_key,description) VALUES (?,?,?,?)',[userId,caseId,key,description]);}
+export async function notify(c,userId,caseId,key,description) {if(userId&&caseId){const [rows]=await c.execute('SELECT u.role,c.client_notifications_enabled FROM users u JOIN cases c ON c.id=? WHERE u.id=?',[caseId,userId]);if(rows[0]?.role==='CLIENT'&&rows[0].client_notifications_enabled===0)return;}if(userId)await c.execute('INSERT IGNORE INTO notifications (user_id,case_id,event_key,description) VALUES (?,?,?,?)',[userId,caseId,key,description]);}
 export async function managers(c,caseId,key,description) {
  const [users]=await c.execute("SELECT u.id FROM users u JOIN cases c ON c.id=? WHERE u.active=1 AND (u.role='ADMIN' OR (u.role='MANAGER' AND u.team_id=c.team_id))",[caseId]);
  for(const u of users)await notify(c,u.id,caseId,key,description);
 }
 export async function queueEmail(c,file,key,subject,message) {
+ const [settings]=await c.execute('SELECT client_notifications_enabled FROM cases WHERE id=?',[file.id]);if(settings[0]?.client_notifications_enabled===0)return false;
  await c.execute('INSERT IGNORE INTO email_outbox (case_id,recipient_contact_id,payload_encrypted,event_key) VALUES (?,?,?,?)',[file.id,file.ghl_contact_id || null,encrypt(JSON.stringify({subject,message,emailTo:file.client_email})),key]);
 }
 export async function refresh(c,file,user) {
@@ -71,14 +72,16 @@ export async function createCase(c,input,user) {
  await refresh(c,file,user);return file;
 }
 export async function sendClientAccess(c,file,user) {
+ if(file.client_notifications_enabled===0)return false;
  const portalUrl=new URL('/',await portalBase()).href;
  let text;
  if(file.client_user_id){text=`Your new application file is ready.\nPortal: ${portalUrl}\nEmail: ${file.client_email}\nLog in using your existing password.`;}
  else {const password=randomBytes(18).toString('base64url');const [result]=await c.execute("INSERT INTO users (name,email,password_hash,role,must_change_password) VALUES (?,?,?,'CLIENT',1)",[file.client_name,file.client_email,await hashPassword(password)]);await c.execute('UPDATE cases SET client_user_id=? WHERE id=?',[result.insertId,file.id]);text=`Your application file is ready.\nPortal: ${portalUrl}\nEmail: ${file.client_email}\nTemporary password: ${password}\nPlease change this password after your first login, then complete your information and upload the requested documents.`;}
  await queueEmail(c,file,`client-access:${file.id}`,'Your client portal login details',text);
- await event(c,file.id,user,'CLIENT_ACCESS_SENT','Client portal login details queued for email delivery.',false);
+ await event(c,file.id,user,'CLIENT_ACCESS_SENT','Client portal login details queued for email delivery.',false);return true;
 }
 export async function invite(c,file,user) {
+ if(file.client_notifications_enabled===0)fail('Client notifications are stopped. Enable them in Reminders & expiry before sending portal access.',409);
  if(file.client_user_id)fail('Client already has an account. Use password reset if needed.');
  const token=randomBytes(32).toString('hex'), hash=createHash('sha256').update(token).digest('hex');
  await c.execute('DELETE FROM invitations WHERE case_id=? AND used_at IS NULL',[file.id]);
