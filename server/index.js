@@ -1,3 +1,4 @@
+import {emailTemplateRoutes} from './email-templates.js';
 import express from 'express';
 import helmet from 'helmet';
 import {rateLimit} from 'express-rate-limit';
@@ -30,6 +31,7 @@ app.post('/api/auth/login',rateLimit({windowMs:15*60000,limit:15,message:{error:
 app.use('/api',publicRoutes);
 app.use('/api',authenticate);
 app.use('/api',emailRoutes);
+app.use('/api',emailTemplateRoutes);
 app.use('/api',connectionRoutes);
 app.get('/api/auth/me',(req,res)=>res.json(req.user));
 app.post('/api/auth/logout',logout);

@@ -2,7 +2,7 @@ import {mkdir,writeFile,readdir,copyFile} from 'node:fs/promises';
 import path from 'node:path';
 import {db} from '../server/db.js';
 import {encrypt} from '../server/crypto.js';
-const tables=['teams','users','categories','category_versions','file_statuses','cases','case_expiries','contract_intake','requirements','document_versions','case_events','tasks','notifications','email_outbox','invitations','integration_settings','email_settings','application_settings','handoff_events','audit_events'];
+const tables=['teams','users','categories','category_versions','file_statuses','cases','case_expiries','contract_intake','requirements','document_versions','case_events','tasks','notifications','email_outbox','invitations','integration_settings','email_settings','email_templates','application_settings','handoff_events','audit_events'];
 const stamp=new Date().toISOString().replace(/[:.]/g,'-'),directory=path.resolve('backups',stamp);
 let c;
 try {

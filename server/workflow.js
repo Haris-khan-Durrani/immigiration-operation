@@ -1,3 +1,4 @@
+import {applyEmailTemplate} from './email-templates.js';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {db} from './db.js';
 import {encrypt} from './crypto.js';
@@ -23,7 +24,7 @@ export async function managers(c,caseId,key,description) {
 }
 export async function queueEmail(c,file,key,subject,message,content={}) {
  const [settings]=await c.execute('SELECT client_notifications_enabled FROM cases WHERE id=?',[file.id]);if(settings[0]?.client_notifications_enabled===0)return false;
- await c.execute('INSERT IGNORE INTO email_outbox (case_id,recipient_contact_id,payload_encrypted,event_key) VALUES (?,?,?,?)',[file.id,file.ghl_contact_id || null,encrypt(JSON.stringify({subject,message,emailTo:file.client_email,...content})),key]);
+ await c.execute('INSERT IGNORE INTO email_outbox (case_id,recipient_contact_id,payload_encrypted,event_key) VALUES (?,?,?,?)',[file.id,file.ghl_contact_id || null,encrypt(JSON.stringify({emailTo:file.client_email,...await applyEmailTemplate(c,file,key,subject,message,content)})),key]);
 }
 export async function refresh(c,file,user) {
  const [requirements]=await c.execute('SELECT * FROM requirements WHERE case_id=?',[file.id]);
