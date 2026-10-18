@@ -1037,3 +1037,7 @@ Internal email history is visible within each section. Interrupted sends are mar
 **Approval and progress:** Internal completion is shown separately from client document completion. Required internal sections must be Completed before approval, submission or final completion. Required fields and document uploads are validated when completing a section. Approval checks run on the server as well as the interface. Category sections, versions, client values, document metadata and staff email queues are included in backups. Database rows are removed with a permanently deleted file; external GHL media follows the application's existing external-storage retention behaviour.
 
 After updating, run `npm run db:migrate` before restarting PM2. No internal notifications are enabled automatically during migration.
+
+### Draft and active status automations
+
+Open Management → Automations → Add automation. Choose the service category first, then a matching operational status. Shared statuses apply across all categories; choose a category-specific status when the rule should be limited to one service. Choose the email template and schedule, and save each rule as Draft or Active. New rules start as drafts. Draft rules are saved and visible but do not queue or deliver emails. Change the state to Active and save to start its delay for matching files. Returning an inherited rule to Draft cancels its pending emails; per-client customized rules keep their own settings. Existing automations retain their active state.
