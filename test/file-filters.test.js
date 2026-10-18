@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+const c=vm.createContext({Intl,Date});vm.runInContext(await readFile(new URL('../public/file-filters.js',import.meta.url),'utf8'),c);
+const base={search:'',category:'',stage:'',status:'',owner:'',lifecycle:'',dateField:'submitted_at',from:'',to:'',min:'',max:'',notifications:''};
+const rows=[{id:1,client_name:'Ahmed',client_email:'ahmed@test.invalid',category_id:2,assigned_to:3,status:'COMPLETED',operational_status_id:4,submitted_at:'2026-10-17T21:00:00Z',progress:{percent:100},client_notifications_enabled:1},{id:2,client_name:'Sara',category_id:5,assigned_to:null,status:'COLLECTING',operational_status_id:null,submitted_at:null,progress:{percent:25},client_notifications_enabled:0}];
+test('advanced file filters combine category, status, owner, progress and lifecycle',()=>{const result=c.filterClientFiles(rows,{...base,category:'2',status:'4',owner:'3',min:'80',lifecycle:'closed'});assert.equal(result.length,1);assert.equal(result[0].id,1);assert.equal(c.filterClientFiles(rows,{...base,status:'unset',notifications:'stopped'})[0].id,2);assert.equal(c.filterClientFiles(rows,{...base,search:'ahmed@test'})[0].id,1);});
+test('date boundaries use Dubai calendar days and exclude missing dates',()=>{assert.equal(c.fileDay('2026-10-17T21:00:00Z'),'2026-10-18');assert.equal(c.filterClientFiles(rows,{...base,from:'2026-10-18',to:'2026-10-18'}).length,1);assert.equal(c.filterClientFiles(rows,{...base,from:'2026-10-19'}).length,0);});
+test('category facets preserve other filters and sorting does not mutate rows',()=>{assert.equal(c.filterClientFiles(rows,{...base,category:'2'},true).length,2);assert.equal(c.sortClientFiles(rows,'completion')[0].id,1);assert.equal(rows[0].id,1);});
