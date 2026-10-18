@@ -980,3 +980,11 @@ Settings is organized into Contract Manager, CRM & storage, Email delivery, Emai
 In **Email templates**, select an automatic action to edit it, or click **New template** to create a reusable team email. Edit the subject and rich text body, insert client/file placeholders, check the sample preview, then save. The preview opens automatically, refreshes after editing, and shows validation errors beside the email. Sample previews never send mail. Automatic templates can be restored to their defaults; reusable templates can be deleted. Only admins manage templates.
 
 Operations staff can select a reusable template from **Saved email template** in a client file's email composer. Client name, email, file number, and portal URL fill automatically. Applying it replaces the subject and body after confirmation if a draft exists. Staff can edit the message and attach files before queuing it. Creating a template does not create an automatic trigger or send an email. Existing per-client notification controls still apply.
+
+### Category-specific file statuses
+
+On **File statuses**, choose a category when creating or editing a status, or select **All categories (shared)**. Existing statuses remain shared after the migration. The category filter shows that category's statuses plus shared statuses; **Shared statuses only** shows the common labels.
+
+When initiating a Contract Manager dossier or adding a previous client, choose the service category first. The status selector then shows matching and shared statuses. Changing the category removes any incompatible selection. Existing files use the same category filtering in **Reminders & expiry**; the server also rejects mismatched statuses. Parent and subcategories each use their own status assignments.
+
+When an existing file changes category, a status specific to the previous category is cleared and recorded in the file activity. Shared statuses remain assigned. A status cannot be restricted to another category while files from incompatible categories use it. Move or delete category statuses before deleting their category. Run `npm run db:migrate` before restarting after this update. Backups include status category assignments.
