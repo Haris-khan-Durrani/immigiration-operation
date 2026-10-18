@@ -1,3 +1,4 @@
+import {statusReminderRoutes} from './status-reminders.js';
 import {emailTemplateRoutes} from './email-templates.js';
 import express from 'express';
 import helmet from 'helmet';
@@ -37,7 +38,7 @@ app.get('/api/auth/me',(req,res)=>res.json(req.user));
 app.post('/api/auth/logout',logout);
 app.use('/api',routes);
 app.use('/api',catalog);
-app.use('/api',fileManagement);
+app.use('/api',statusReminderRoutes);app.use('/api',fileManagement);
 app.use('/api/settings',permit('ADMIN'));
 app.use('/api/users',permit('ADMIN'));
 app.get('/api/users',async(req,res)=>{const [rows]=await db.query('SELECT id,name,email,role,active,team_id,created_at FROM users ORDER BY id DESC');res.json(rows);});

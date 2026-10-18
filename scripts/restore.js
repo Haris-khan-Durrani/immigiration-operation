@@ -3,8 +3,8 @@ import path from 'node:path';
 import {db} from '../server/db.js';
 import {decrypt} from '../server/crypto.js';
 const directory=process.argv[2];if(!directory)throw new Error('Usage: npm run restore -- <backup-directory>. Target must be a freshly migrated empty database.');
-const tables=['teams','users','categories','category_versions','file_statuses','cases','case_expiries','contract_intake','requirements','document_versions','case_events','tasks','notifications','email_outbox','invitations','integration_settings','email_settings','email_templates','application_settings','handoff_events','audit_events'];
-const backup=JSON.parse(decrypt(await readFile(path.resolve(directory,'database.enc'),'utf8')));if(backup.tables && !backup.tables.email_settings)backup.tables.email_settings=[];if(backup.tables)for(const t of ['file_statuses','case_expiries','email_templates'])backup.tables[t] ??= [];if(backup.version!==1||tables.some(t=>!Array.isArray(backup.tables[t])))throw new Error('Invalid backup.');
+const tables=['teams','users','categories','category_versions','file_statuses','cases','status_reminders','case_expiries','contract_intake','requirements','document_versions','case_events','tasks','notifications','email_outbox','invitations','integration_settings','email_settings','email_templates','application_settings','handoff_events','audit_events'];
+const backup=JSON.parse(decrypt(await readFile(path.resolve(directory,'database.enc'),'utf8')));if(backup.tables && !backup.tables.email_settings)backup.tables.email_settings=[];if(backup.tables)for(const t of ['file_statuses','case_expiries','email_templates','status_reminders'])backup.tables[t] ??= [];if(backup.version!==1||tables.some(t=>!Array.isArray(backup.tables[t])))throw new Error('Invalid backup.');
 const c=await db.getConnection();try {
  await c.beginTransaction();for(const table of tables.filter(t=>t!=='application_settings')){const [rows]=await c.query('SELECT COUNT(*) AS n FROM '+table);if(rows[0].n)throw new Error('Restore requires an empty target database. Existing records will not be overwritten.');}
  await c.query('DELETE FROM application_settings');

@@ -99,3 +99,6 @@ html[data-theme=dark] #session-loading{background:#142232;color:#e6edf5}html[dat
 .status-color-swatches button:hover:not(:disabled),html[data-theme=dark] .status-color-swatches button:hover:not(:disabled){background:var(--swatch);border-color:#fff;filter:brightness(1.08)}
 
 .quick-file-status{display:flex;flex-wrap:wrap;align-items:center;gap:10px;max-width:420px}.quick-file-status select{width:100%;min-height:44px;font-weight:500}.quick-file-status>small{width:100%;font-weight:400;font-size:11px;color:#72849a}.quick-file-status .status-pill{font-weight:500}
+
+.reminder-rule{border:1px solid #dce5ed;border-radius:10px;padding:16px;margin-bottom:16px}.file-status-reminder{border:1px solid #dce5ed;border-radius:10px;padding:18px;margin:14px 0;display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between}.file-status-reminder p{font-size:12px;color:#72849a}.file-status-reminder small{font-size:11px}.reminder-email-preview{padding:20px;border:1px solid #dce5ed;border-radius:10px}.reminder-email-preview .email-message-body{white-space:pre-wrap}html[data-theme=dark] .reminder-rule,html[data-theme=dark] .file-status-reminder,html[data-theme=dark] .reminder-email-preview{border-color:#395068}
+.file-status-reminder .row-actions{align-self:center;align-items:center}

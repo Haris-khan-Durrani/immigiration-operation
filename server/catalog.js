@@ -1,3 +1,4 @@
+import {syncStatusReminders} from './status-reminders.js';
 import {Router} from 'express';
 import {db} from './db.js';
 import {permit} from './auth.js';
@@ -19,7 +20,7 @@ catalog.post('/cases/:id/category',manage,async(req,res)=>{
   const fields=expandFields(normalizeFields(json(cat.fields)),json(file.applicants) || [{key:'primary',name:file.client_name}]);
   const prefix='v'+cat.id+'_'+cat.version+'_'+Date.now()+'_';const definitions=fields.map(f=>({...f,key:prefix+f.key,condition:f.condition?{...f.condition,key:prefix+f.condition.key}:undefined}));
   await c.execute('UPDATE requirements SET waived=1 WHERE case_id=?',[file.id]);for(const f of definitions)await c.execute('INSERT INTO requirements (case_id,field_key,definition) VALUES (?,?,?)',[file.id,f.key,JSON.stringify(f)]);
-  if(file.operational_status_id){const [statuses]=await c.execute('SELECT category_id FROM file_statuses WHERE id=? FOR UPDATE',[file.operational_status_id]);if(statuses[0]?.category_id!==null&&Number(statuses[0]?.category_id)!==Number(cat.id)){await c.execute('UPDATE cases SET operational_status_id=NULL WHERE id=?',[file.id]);await event(c,file.id,req.user,'FILE_STATUS_CLEARED','Operational status cleared because the file category changed.');}}
+  if(file.operational_status_id){const [statuses]=await c.execute('SELECT category_id FROM file_statuses WHERE id=? FOR UPDATE',[file.operational_status_id]);if(statuses[0]?.category_id!==null&&Number(statuses[0]?.category_id)!==Number(cat.id)){await c.execute('UPDATE cases SET operational_status_id=NULL WHERE id=?',[file.id]);await syncStatusReminders(c,{...file,operational_status_id:null});await event(c,file.id,req.user,'FILE_STATUS_CLEARED','Operational status cleared because the file category changed.');}}
   await c.execute("UPDATE cases SET category_id=?,category_version=?,requirements_snapshot=?,status='COLLECTING',approved_by=NULL,approved_at=NULL WHERE id=?",[cat.id,cat.version,JSON.stringify(definitions),file.id]);await event(c,file.id,req.user,'CATEGORY_MIGRATED','Document checklist updated to '+cat.name+' version '+cat.version+'.',true);await refresh(c,{...file,status:'COLLECTING'},req.user);
  });res.json({saved:true});
 });
