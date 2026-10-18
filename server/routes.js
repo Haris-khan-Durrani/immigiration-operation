@@ -1,3 +1,4 @@
+import {internalApprovalReady,internalWorkProgress} from './internal-work.js';
 import {renderTemplate,redactEmail} from './email-templates.js';
 import {emailUpload,composeEmail} from './email-compose.js';
 import {readMedia} from './storage.js';
@@ -82,7 +83,8 @@ async function caseDetails(req,res,clientPreview=false){
  const [publishedGuides]=await db.execute('SELECT version,fields FROM category_versions WHERE category_id=? ORDER BY version DESC LIMIT 1',[file.category_id]);
  const categoryInstructions=(publishedGuides.length?json(publishedGuides[0].fields):requirements.map(r=>json(r.definition))).filter(f=>f.instructionRole);
  const safeFile={id:file.id,client_user_id:file.client_user_id,client_name:file.client_name,status:file.status,due_at:file.due_at,category_version:file.category_version,applicants:json(file.applicants),approved_at:file.approved_at};
- res.json({categoryInstructions,instructionsVersion:publishedGuides[0]?.version || file.category_version,expiries,file:(clientPreview||req.user.role==='CLIENT')?safeFile:{...file,summary_json:json(file.summary_json)},requirements:requirements.map(r=>({...r,definition:json(r.definition),value_json:json(r.value_json),applicable:applicable(r,requirements)})),documents,events,tasks,emails,progress:completion(requirements,documents)});
+ const internalProgress=(clientPreview||req.user.role==='CLIENT')?undefined:await internalWorkProgress(db,file.id);
+ res.json({internalProgress,categoryInstructions,instructionsVersion:publishedGuides[0]?.version || file.category_version,expiries,file:(clientPreview||req.user.role==='CLIENT')?safeFile:{...file,summary_json:json(file.summary_json)},requirements:requirements.map(r=>({...r,definition:json(r.definition),value_json:json(r.value_json),applicable:applicable(r,requirements)})),documents,events,tasks,emails,progress:completion(requirements,documents)});
 }
 const deleteApprovalLimit=rateLimit({windowMs:15*60000,limit:10,message:{error:'Too many deletion attempts. Please try again in 15 minutes.'}});
 routes.post('/cases/:id/delete-approval',staffOnly,deleteApprovalLimit,async(req,res)=>{
@@ -101,7 +103,7 @@ routes.delete('/cases/:id',staffOnly,async(req,res)=>{
  await transaction(async c=>{
   const file=await loadCase(c,req.params.id,req.user,true);
   const [admins]=await c.execute("SELECT id,email,password_hash FROM users WHERE id=? AND role='ADMIN' AND active=1 AND must_change_password=0 FOR UPDATE",[approval.adminId]);if(!admins.length||createHash('sha256').update(admins[0].password_hash).digest('hex')!==approval.adminHash)fail('Administrator authorization changed. Verify credentials again.',403);
-  const [sending]=await c.execute("SELECT id FROM email_outbox WHERE case_id=? AND status='SENDING' LIMIT 1 FOR UPDATE",[file.id]);if(sending.length)fail('An email is currently sending. Try again after delivery finishes.',409);
+  const [sending]=await c.execute("SELECT id FROM email_outbox WHERE case_id=? AND status='SENDING' LIMIT 1 FOR UPDATE",[file.id]);if(sending.length)fail('An email is currently sending. Try again after delivery finishes.',409);const [internalSending]=await c.execute("SELECT id FROM internal_email_outbox WHERE case_id=? AND status='SENDING' LIMIT 1 FOR UPDATE",[file.id]);if(internalSending.length)fail('An internal staff email is currently sending. Try again after delivery finishes.',409);
   await c.execute('DELETE FROM notifications WHERE case_id=?',[file.id]);
   await c.execute('DELETE FROM handoff_events WHERE case_id=? OR contract_id=?',[file.id,file.source_contract_id]);
   await c.execute('DELETE FROM contract_intake WHERE case_id=?',[file.id]);
@@ -206,6 +208,7 @@ routes.post('/documents/:id/review',staffOnly,async(req,res)=>{
 routes.post('/cases/:id/status',manage,async(req,res)=>{
  const {status,reason}=req.body;if(!['COLLECTING','APPROVED','SUBMITTED','COMPLETED','CANCELLED'].includes(status))fail('Invalid processing status.');
  await transaction(async c=>{const file=await loadCase(c,req.params.id,req.user,true);const progress=await refresh(c,file,req.user);const current=(await loadCase(c,file.id,null)).status;
+  if(['APPROVED','SUBMITTED','COMPLETED'].includes(status)&&!await internalApprovalReady(c,file.id))fail('Complete required internal work sections before approving or progressing this file.',409);
   if(status==='APPROVED'&&(!progress.ready||current!=='READY_FOR_MANAGER_REVIEW'))fail('All mandatory requirements must be satisfied before manager approval.',409);
   if(status==='SUBMITTED'&&current!=='APPROVED'||status==='COMPLETED'&&current!=='SUBMITTED')fail('Approve, then submit, then complete the file.',409);
   if(['COLLECTING','CANCELLED'].includes(status)&&(typeof reason!=='string'||!reason.trim()))fail('Provide a reason.');

@@ -1,5 +1,5 @@
 const workspacePaths={overview:'dashboard',intake:'new-clients',cases:'client-files',documents:'file-review',tasks:'my-tasks',categories:'categories',statuses:'file-statuses',automations:'automations',users:'team',settings:'settings',audit:'activity-log',notifications:'notifications',account:'account'};
-const workspaceTabs=['overview','tracking','documents','information','tasks','activity'];
+const workspaceTabs=['overview','tracking','documents','information','internal','tasks','activity'];
 function parseWorkspaceUrl(value){
  const url=new URL(value,'https://operations.invalid'),parts=url.pathname.split('/').filter(Boolean),view=Object.keys(workspacePaths).find(key=>workspacePaths[key]===parts[0]||(key==='documents'&&parts[0]==='document-review'))||'overview';
  const id=value=>/^\d+$/.test(value||'')&&Number.isSafeInteger(Number(value))&&Number(value)>0?String(Number(value)):null;

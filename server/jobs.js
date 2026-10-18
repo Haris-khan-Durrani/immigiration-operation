@@ -1,3 +1,4 @@
+import {internalDeadlineJobs,deliverInternalEmails} from './internal-work.js';
 import {queueStatusReminders,statusReminderEligible} from './status-reminders.js';
 import {renderTemplate} from './email-templates.js';
 import {db} from './db.js';
@@ -16,7 +17,7 @@ export async function runJobs({send}={}) {
   for(const t of tasks)await notify(c,t.assigned_to,t.case_id,`overdue-task:${t.id}`,'Task overdue: '+t.title);
   const [cases]=await c.query("SELECT * FROM cases WHERE due_at<NOW() AND status NOT IN ('DELETED','COMPLETED','CANCELLED')");
   for(const f of cases)await notify(c,f.assigned_to,f.id,`overdue-case:${f.id}`,'Client file is overdue.');
-  await queueStatusReminders(c);
+  await internalDeadlineJobs(c);await queueStatusReminders(c);
   const portal=await portalBase();
   const [scheduled]=await c.query("SELECT * FROM cases WHERE reminder_every_hours IS NOT NULL AND next_reminder_at<=NOW() AND status NOT IN ('DELETED','COMPLETED','CANCELLED','SUBMITTED') FOR UPDATE");
   for(const f of scheduled){const [requirements]=await c.execute('SELECT * FROM requirements WHERE case_id=?',[f.id]);const [documents]=await c.execute('SELECT v.* FROM document_versions v JOIN requirements r ON r.id=v.requirement_id WHERE r.case_id=? ORDER BY v.version DESC',[f.id]);const missing=missingDocumentLabels(requirements,documents);const [pending]=await c.execute("SELECT id FROM email_outbox WHERE case_id=? AND event_key LIKE ? AND status IN ('QUEUED','SENDING','FAILED','UNKNOWN') LIMIT 1",[f.id,`document-reminder:${f.id}:%`]);if(missing.length&&!pending.length){const key=`document-reminder:${f.id}:${new Date(f.next_reminder_at).toISOString()}`;await queueEmail(c,f,key,'Reminder: documents needed for your application','Please upload these documents in your client portal:\n'+missing.map(name=>'- '+name).join('\n')+'\nPortal: '+portal);await notify(c,f.client_user_id,f.id,key,'Please upload your outstanding documents.');}await c.execute('UPDATE cases SET next_reminder_at=DATE_ADD(NOW(),INTERVAL ? HOUR) WHERE id=?',[f.reminder_every_hours,f.id]);}
@@ -26,6 +27,7 @@ export async function runJobs({send}={}) {
  });
  // A crashed send has an uncertain outcome. Do not automatically send it twice.
  await db.query("UPDATE email_outbox SET status='UNKNOWN',last_error='Interrupted send. Check your email provider before retrying.' WHERE status='SENDING' AND next_attempt_at<DATE_SUB(NOW(),INTERVAL 10 MINUTE)");
+ await deliverInternalEmails(send);
  const config=await emailSettings();if(!(send ?? !!config.enabled))return;
  for(let i=0;i<10;i++) {
   const job=await transaction(async c=>{const [rows]=await c.query("SELECT * FROM email_outbox WHERE status='QUEUED' AND next_attempt_at<=NOW() ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED");if(!rows.length)return null;await c.execute("UPDATE email_outbox SET status='SENDING',attempts=attempts+1,next_attempt_at=NOW() WHERE id=?",[rows[0].id]);return rows[0];});

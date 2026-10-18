@@ -1,3 +1,4 @@
+import {applyInternalSections} from './internal-work.js';
 import {applyEmailTemplate} from './email-templates.js';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {db} from './db.js';
@@ -70,7 +71,7 @@ export async function createCase(c,input,user) {
  if(input.contractUrl){if(typeof input.contractUrl!=='string'||!/^https:\/\/[^\s]+$/.test(input.contractUrl))fail('Signed contract link must use HTTPS.');await c.execute('UPDATE cases SET contract_url=? WHERE id=?',[input.contractUrl,file.id]);file.contract_url=input.contractUrl;}
  await event(c,file.id,user,'CASE_CREATED','Your application file has been opened and documents requested.',true);
  await notify(c,file.assigned_to,file.id,`new-case:${file.id}`,'A new client file has been assigned to you.');
- await refresh(c,file,user);return file;
+ await applyInternalSections(c,file);await refresh(c,file,user);return file;
 }
 export async function sendClientAccess(c,file,user) {
  if(file.client_notifications_enabled===0)return false;
