@@ -659,7 +659,7 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
 
   modal('Request Service Category Change', `
     <div class="category-request-form-shell">
-      <div class="notice">
+      <div class="notice" id="category-modal-notice">
         <strong>Conditional Category Change</strong>
         <p>The category will NOT change immediately. The file will be placed on hold and this Service Agreement will be sent to the client. The category changes only once the client signs, or you can cancel this request at any time to resume the current category.</p>
       </div>
@@ -667,23 +667,69 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
         <div class="category-modal-form-col">
           <form id="category-request-form">
             ${select('Target service category', 'categoryId', publishedCats.map(c => [c.id, `${c.name} (version ${c.version})`]))}
-            ${select('Choose agreement template', 'templateId', templates.map(t => [t.id, `${t.name}${t.is_default ? ' · Default' : ''}`]), activeTemplate.id)}
-            ${input('Agreement title', 'agreementTitle', 'text', activeTemplate.title, 'required maxlength="240"')}
-            ${guideEditor('Agreement terms & addendum clauses', 'agreementText', initialBody)}
-            <p class="hint">You can review and edit these terms using the rich text tools before sending them to the client for signature. You can cancel and close this modal at any time.</p>
+
+            <div class="agreement-requirement-toggle-card" id="skip-agreement-card">
+              <label class="agreement-skip-checkbox-label">
+                <input type="checkbox" id="skip-agreement-toggle" name="skipAgreement" value="1" />
+                <span class="agreement-toggle-text">
+                  <strong>Signed agreement not required (Change category immediately)</strong>
+                  <small>Without signing: Updates the file category and checklist immediately without putting the file on hold or requesting a client signature.</small>
+                </span>
+              </label>
+            </div>
+
+            <div id="agreement-builder-fields">
+              ${select('Choose agreement template', 'templateId', templates.map(t => [t.id, `${t.name}${t.is_default ? ' · Default' : ''}`]), activeTemplate.id)}
+              ${input('Agreement title', 'agreementTitle', 'text', activeTemplate.title, 'required maxlength="240"')}
+              ${guideEditor('Agreement terms & addendum clauses', 'agreementText', initialBody)}
+              <p class="hint">You can review and edit these terms using the rich text tools before sending them to the client for signature. You can cancel and close this modal at any time.</p>
+            </div>
+
+            <div id="direct-change-notes-wrap" style="display: none; margin-top: 10px;">
+              ${area('Reason / Note for direct change without agreement (Optional)', 'skipReason', '', 'placeholder="e.g. Agreement executed offline, administrative checklist transition, client requested direct change..." maxlength="500"')}
+              <p class="hint">This note will be recorded in the file activity audit trail.</p>
+            </div>
+
             <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
               <button type="button" id="discard-category-modal-btn" class="secondary">Cancel &amp; Close</button>
-              <button type="submit" class="primary">Send agreement to client</button>
+              <button type="submit" id="submit-category-modal-btn" class="primary">Send agreement to client</button>
             </div>
           </form>
         </div>
         <div class="category-modal-preview-col">
           <div class="modal-preview-card">
-            <div class="modal-preview-header">
-              <strong>Live Agreement Preview</strong>
-              <span class="preview-badge">Client A4 View</span>
+            <div class="modal-preview-header" id="modal-preview-header">
+              <strong id="modal-preview-header-title">Live Agreement Preview</strong>
+              <span class="preview-badge" id="modal-preview-header-badge">Client A4 View</span>
             </div>
             <div id="category-modal-a4-viewport" class="a4-document-viewport modal-preview-body"></div>
+            <div id="direct-change-preview-msg" class="direct-change-preview-placeholder" style="display: none;">
+              <div class="direct-preview-icon" aria-hidden="true">⚡</div>
+              <h3>Direct Category Migration</h3>
+              <p class="direct-preview-subtitle">Signed agreement is marked as <strong>not required</strong>.</p>
+              <div class="direct-preview-card-box">
+                <div class="direct-preview-row">
+                  <span class="direct-lbl">Current Category:</span>
+                  <span class="direct-val">${esc(file.category_name || 'Current Service')}</span>
+                </div>
+                <div class="direct-preview-row">
+                  <span class="direct-lbl">Target Category:</span>
+                  <strong class="direct-val" id="direct-preview-target-name">${esc(firstCat.name)} (v${esc(firstCat.version)})</strong>
+                </div>
+                <div class="direct-preview-row">
+                  <span class="direct-lbl">Checklist Effect:</span>
+                  <span class="direct-val">Updates requirements immediately to the new category</span>
+                </div>
+                <div class="direct-preview-row">
+                  <span class="direct-lbl">Client Signature:</span>
+                  <span class="direct-val">Skipped (no agreement will be sent)</span>
+                </div>
+                <div class="direct-preview-row">
+                  <span class="direct-lbl">File Status:</span>
+                  <span class="direct-val">Remains active (will NOT be placed on hold)</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -698,6 +744,17 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
   const modalEditor = [...activeGuideEditors].find(e => formSurface && formSurface.contains(e.view.dom));
   const previewViewport = document.querySelector('#category-modal-a4-viewport');
 
+  const skipToggle = document.querySelector('#skip-agreement-toggle');
+  const skipCard = document.querySelector('#skip-agreement-card');
+  const agreementFields = document.querySelector('#agreement-builder-fields');
+  const directChangeNotes = document.querySelector('#direct-change-notes-wrap');
+  const modalNotice = document.querySelector('#category-modal-notice');
+  const submitBtn = document.querySelector('#submit-category-modal-btn');
+  const directPreviewMsg = document.querySelector('#direct-change-preview-msg');
+  const directPreviewTarget = document.querySelector('#direct-preview-target-name');
+  const previewHeaderTitle = document.querySelector('#modal-preview-header-title');
+  const previewHeaderBadge = document.querySelector('#modal-preview-header-badge');
+
   function updateModalPreview() {
     if (!previewViewport) return;
     const selectedCat = publishedCats.find(c => String(c.id) === (categorySelect ? categorySelect.value : '')) || publishedCats[0];
@@ -705,7 +762,69 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
     const titleVal = titleInput ? titleInput.value.trim() : activeTemplate.title;
     const bodyVal = modalEditor ? modalEditor.getHTML() : initialBody;
     previewViewport.innerHTML = formatA4DocumentHtml(titleVal, bodyVal, vars, { mode: 'preview' });
+    if (directPreviewTarget) {
+      directPreviewTarget.textContent = `${selectedCat.name} (v${selectedCat.version})`;
+    }
   }
+
+  function handleSkipToggle() {
+    const isSkip = skipToggle && skipToggle.checked;
+    if (skipCard) skipCard.classList.toggle('active-skip', isSkip);
+    if (agreementFields) agreementFields.style.display = isSkip ? 'none' : 'block';
+    if (directChangeNotes) directChangeNotes.style.display = isSkip ? 'block' : 'none';
+    if (previewViewport) previewViewport.style.display = isSkip ? 'none' : 'block';
+    if (directPreviewMsg) directPreviewMsg.style.display = isSkip ? 'flex' : 'none';
+
+    if (titleInput) {
+      if (isSkip) {
+        titleInput.removeAttribute('required');
+      } else {
+        titleInput.setAttribute('required', 'required');
+      }
+    }
+
+    const selectedCat = publishedCats.find(c => String(c.id) === (categorySelect ? categorySelect.value : '')) || publishedCats[0];
+    if (directPreviewTarget) {
+      directPreviewTarget.textContent = `${selectedCat.name} (v${selectedCat.version})`;
+    }
+
+    if (isSkip) {
+      if (modalNotice) {
+        modalNotice.className = 'notice direct-change-notice';
+        modalNotice.innerHTML = `
+          <strong>Direct Category Change (No Signed Agreement Required)</strong>
+          <p>The file category and document checklist will update <strong>immediately</strong> upon clicking apply. The file will NOT be placed on hold and the client will NOT be requested to sign an agreement.</p>
+        `;
+      }
+      if (previewHeaderTitle) previewHeaderTitle.textContent = 'Direct Migration Summary';
+      if (previewHeaderBadge) {
+        previewHeaderBadge.textContent = 'Immediate Effect';
+        previewHeaderBadge.className = 'preview-badge badge accepted';
+      }
+      if (submitBtn) {
+        submitBtn.textContent = 'Apply category change immediately';
+      }
+    } else {
+      if (modalNotice) {
+        modalNotice.className = 'notice';
+        modalNotice.innerHTML = `
+          <strong>Conditional Category Change</strong>
+          <p>The category will NOT change immediately. The file will be placed on hold and this Service Agreement will be sent to the client. The category changes only once the client signs, or you can cancel this request at any time to resume the current category.</p>
+        `;
+      }
+      if (previewHeaderTitle) previewHeaderTitle.textContent = 'Live Agreement Preview';
+      if (previewHeaderBadge) {
+        previewHeaderBadge.textContent = 'Client A4 View';
+        previewHeaderBadge.className = 'preview-badge';
+      }
+      if (submitBtn) {
+        submitBtn.textContent = 'Send agreement to client';
+      }
+      updateModalPreview();
+    }
+  }
+
+  if (skipToggle) skipToggle.addEventListener('change', handleSkipToggle);
 
   let timer = null;
   const scheduleUpdate = () => {
@@ -745,6 +864,23 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
   }
 
   bindForm('category-request-form', async v => {
+    const isSkip = skipToggle && skipToggle.checked;
+    const selectedCat = publishedCats.find(c => String(c.id) === String(v.categoryId)) || publishedCats[0];
+
+    if (isSkip) {
+      await api(`cases/${file.id}/category`, 'POST', {
+        categoryId: Number(v.categoryId),
+        confirm: true,
+        skipAgreement: true,
+        reason: v.skipReason || 'Direct category change by Operations (no signed agreement required)'
+      });
+      destroyGuideEditors();
+      closeModal();
+      if (onComplete) await onComplete();
+      success(`Service category changed directly to ${selectedCat.name} (v${selectedCat.version}). Checklist updated.`);
+      return;
+    }
+
     const finalBody = modalEditor && !modalEditor.isEmpty
       ? (OperationsRichText.prefix + OperationsRichText.sanitize(modalEditor.getHTML()))
       : v.agreementText;

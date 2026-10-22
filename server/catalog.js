@@ -38,16 +38,30 @@ export async function applyCategoryMigration(c,file,cat,user){
  return {definitions};
 }
 
-catalog.post('/cases/:id/category',manage,async(req,res)=>{
+catalog.post('/cases/:id/category',permit('ADMIN','MANAGER','AGENT'),async(req,res)=>{
  if(req.body.confirm!==true)fail('Confirm applying the published template. Existing requirements will be retained as waived history.');
  await transaction(async c=>{
   const file=await loadCase(c,req.params.id,req.user,true);
   if(['SUBMITTED','COMPLETED','CANCELLED'].includes(file.status))fail('Reopen the file before changing its category.');
   const [pending]=await c.execute("SELECT id FROM category_change_requests WHERE case_id=? AND status='PENDING' LIMIT 1",[file.id]);
-  if(pending.length)fail('A category change request is pending client signature. Cancel or sign that request first.',409);
+  if(pending.length){
+   if(req.body.cancelPending || req.body.skipAgreement){
+    await c.execute("UPDATE category_change_requests SET status='CANCELLED',cancelled_by=?,cancelled_at=NOW(),cancel_reason=? WHERE case_id=? AND status='PENDING'",[
+     req.user.id,
+     'Superseded by direct category change (no signed agreement required)',
+     file.id
+    ]);
+   } else {
+    fail('A category change request is pending client signature. Cancel or sign that request first.',409);
+   }
+  }
   const [rows]=await c.execute("SELECT * FROM categories WHERE id=? AND status='PUBLISHED'",[Number(req.body.categoryId)||0]);
   if(!rows.length)fail('Choose a published category.');
-  await applyCategoryMigration(c,file,rows[0],req.user);
+  const targetCat=rows[0];
+  await applyCategoryMigration(c,file,targetCat,req.user);
+  const noteReason=typeof req.body.reason==='string'&&req.body.reason.trim()?req.body.reason.trim().slice(0,500):'Direct change by Operations (no signed agreement required)';
+  await event(c,file.id,req.user,'CATEGORY_DIRECT_CHANGE',`Category changed directly to ${targetCat.name} (v${targetCat.version}) without signed agreement. Note: ${noteReason}`,true);
+  await notify(c,file.client_user_id,file.id,`category-migrated:${targetCat.id}:${Date.now()}`,`Your file service category has been updated to ${targetCat.name}.`);
  });
  res.json({saved:true});
 });
