@@ -59,6 +59,7 @@ try {
       }
     }
   }
-  await db.query("INSERT IGNORE INTO application_settings (id,settings) VALUES (1,JSON_OBJECT('activationDate',NULL,'allowedPipelines',JSON_ARRAY(),'defaultCategoryId',NULL,'defaultAgentId',NULL,'ghlMediaCopy',false,'mediaPrivacyVerified',false))");
+  await db.query("INSERT IGNORE INTO application_settings (id,settings) VALUES (1,JSON_OBJECT('activationDate',NULL,'allowedPipelines',JSON_ARRAY(),'defaultCategoryId',NULL,'defaultAgentId',NULL,'ghlMediaCopy',false,'mediaPrivacyVerified',false,'companyBranding',JSON_OBJECT('companyName','Operations Immigration & Legal Services','documentSubtitle','OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT','logoUrl','')))");
+  await db.query("UPDATE application_settings SET settings=JSON_SET(settings,'$.companyBranding',JSON_OBJECT('companyName','Operations Immigration & Legal Services','documentSubtitle','OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT','logoUrl','')) WHERE JSON_EXTRACT(settings,'$.companyBranding') IS NULL");
   console.log('MySQL schema initialized.');
 } finally { await db.end(); }

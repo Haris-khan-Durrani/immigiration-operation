@@ -1027,6 +1027,21 @@ html[data-theme=dark] .view-agreement-btn {
   color: #ffffff;
   border-radius: 6px;
 }
+.a4-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 140px;
+  max-height: 48px;
+}
+.a4-company-logo {
+  max-width: 140px;
+  max-height: 48px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
 .a4-brand-text {
   display: flex;
   flex-direction: column;
@@ -1619,5 +1634,314 @@ html[data-theme=dark] .a4-break-line {
     display: none !important;
   }
 }
+
+/* ==========================================================================
+   Company Branding & Agreement Letterhead Settings
+   ========================================================================== */
+.agreements-settings-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.company-branding-card {
+  background: var(--surface-bg, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.branding-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+.branding-header-text h2 {
+  margin: 0 0 6px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-heading, #0f172a);
+}
+.branding-header-text .muted {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted-color, #64748b);
+  line-height: 1.45;
+}
+.branding-header-badge {
+  flex-shrink: 0;
+}
+.branding-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .branding-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.branding-inputs-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.branding-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.branding-field-group label {
+  font-size: 0.88rem;
+  color: var(--text-heading, #1e293b);
+}
+.branding-field-group input[type="text"] {
+  padding: 9px 12px;
+  font-size: 0.92rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  background: var(--input-bg, #ffffff);
+  color: var(--text-color, #0f172a);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.branding-field-group input[type="text"]:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.branding-field-group .hint {
+  font-size: 0.78rem;
+  color: var(--muted-color, #64748b);
+  line-height: 1.35;
+}
+.logo-uploader-box {
+  background: var(--surface-subtle, #f8fafc);
+  border: 1.5px dashed var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  padding: 16px;
+}
+.logo-uploader-status-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.logo-thumb-wrapper {
+  width: 80px;
+  height: 60px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+.logo-thumb-wrapper img {
+  max-width: 74px;
+  max-height: 54px;
+  object-fit: contain;
+}
+.logo-thumb-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.logo-thumb-placeholder .empty-icon {
+  font-size: 1.3rem;
+}
+.logo-uploader-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+.logo-uploader-controls button.secondary {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 7px 14px;
+}
+.logo-uploader-controls .danger-button.small {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+.logo-specs-hint {
+  margin-top: 2px;
+}
+.branding-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+.branding-indicator {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+/* Mini Letterhead Live Simulation */
+.branding-preview-col {
+  position: sticky;
+  top: 20px;
+}
+.branding-preview-card {
+  background: var(--surface-subtle, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+.branding-preview-card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-heading, #1e293b);
+}
+.preview-mini-pill {
+  font-size: 0.72rem;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.branding-mini-letterhead {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+.mini-letterhead-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 10px;
+}
+.mini-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 68%;
+}
+.mini-logo-container {
+  max-width: 72px;
+  max-height: 36px;
+  display: flex;
+  align-items: center;
+}
+.mini-logo-img {
+  max-width: 72px;
+  max-height: 36px;
+  object-fit: contain;
+}
+.mini-emblem {
+  width: 32px;
+  height: 32px;
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.mini-text-stack {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mini-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-subtitle {
+  font-size: 8px;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-meta-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  flex-shrink: 0;
+}
+.mini-meta-lbl {
+  font-size: 7px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.06em;
+}
+.mini-meta-code {
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #0f172a;
+  font-family: monospace;
+}
+.mini-meta-dt {
+  font-size: 7.5px;
+  color: #64748b;
+}
+.branding-preview-hint {
+  font-size: 0.78rem;
+  color: var(--muted-color, #64748b);
+  margin-top: 10px;
+  margin-bottom: 0;
+  line-height: 1.45;
+}
+
+/* Dark mode overrides */
+html[data-theme="dark"] .branding-mini-letterhead {
+  background: #ffffff; /* Preserved paper white for realistic legal document preview */
+  color: #0f172a;
+}
+html[data-theme="dark"] .branding-mini-letterhead .mini-title,
+html[data-theme="dark"] .branding-mini-letterhead .mini-meta-code {
+  color: #0f172a;
+}
+html[data-theme="dark"] .logo-uploader-box {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+html[data-theme="dark"] .branding-preview-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 
 

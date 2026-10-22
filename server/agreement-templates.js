@@ -1,10 +1,139 @@
 import {Router} from 'express';
 import {db} from './db.js';
 import {permit} from './auth.js';
-import {fail} from './domain.js';
+import {fail, json} from './domain.js';
 import {transaction} from './workflow.js';
+import multer from 'multer';
 
 export const agreementTemplateRoutes = Router();
+
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024, files: 1 }
+});
+
+const DEFAULT_BRANDING = {
+  companyName: 'Operations Immigration & Legal Services',
+  documentSubtitle: 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT',
+  logoUrl: ''
+};
+
+export async function getCompanyBranding() {
+  const [rows] = await db.query('SELECT settings FROM application_settings WHERE id=1');
+  const settings = json(rows[0]?.settings || {});
+  return {
+    ...DEFAULT_BRANDING,
+    ...(settings.companyBranding || {})
+  };
+}
+
+// Any authenticated user can read branding for document letterheads
+agreementTemplateRoutes.get('/branding', async (req, res) => {
+  const branding = await getCompanyBranding();
+  res.json({
+    companyName: branding.companyName,
+    documentSubtitle: branding.documentSubtitle,
+    logoUrl: branding.logoUrl || '',
+    hasLogo: Boolean(branding.logoUrl)
+  });
+});
+
+// Management updates company branding texts & optional logo data URL
+agreementTemplateRoutes.put('/settings/branding', permit('ADMIN', 'MANAGER'), async (req, res) => {
+  const { companyName, documentSubtitle, logoUrl } = req.body;
+  if (companyName !== undefined && (typeof companyName !== 'string' || !companyName.trim() || companyName.length > 200)) {
+    fail('Enter a valid company name (up to 200 characters).');
+  }
+  if (documentSubtitle !== undefined && (typeof documentSubtitle !== 'string' || documentSubtitle.length > 200)) {
+    fail('Enter a valid document subtitle (up to 200 characters).');
+  }
+
+  const current = await getCompanyBranding();
+  const updated = {
+    companyName: companyName !== undefined ? companyName.trim() : current.companyName,
+    documentSubtitle: documentSubtitle !== undefined ? documentSubtitle.trim() : current.documentSubtitle,
+    logoUrl: logoUrl !== undefined ? (typeof logoUrl === 'string' ? logoUrl : '') : current.logoUrl,
+    updatedAt: new Date().toISOString()
+  };
+
+  await transaction(async c => {
+    await c.execute(
+      "UPDATE application_settings SET settings=JSON_SET(settings, '$.companyBranding', JSON_EXTRACT(?, '$')) WHERE id=1",
+      [JSON.stringify(updated)]
+    );
+    await c.execute(
+      'INSERT INTO audit_events (actor, action, details) VALUES (?, ?, ?)',
+      [req.user.email, 'COMPANY_BRANDING_UPDATED', JSON.stringify({ companyName: updated.companyName, hasLogo: Boolean(updated.logoUrl) })]
+    );
+  });
+
+  res.json({ saved: true, branding: updated });
+});
+
+// Management uploads company logo file (multipart form data)
+agreementTemplateRoutes.post('/settings/branding/logo', permit('ADMIN', 'MANAGER'), (req, res, next) => {
+  logoUpload.single('logo')(req, res, err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') fail('Logo file exceeds 4MB limit.', 400);
+      return next(err);
+    }
+    next();
+  });
+}, async (req, res) => {
+  if (!req.file) fail('Select an image file to upload as company logo.');
+  const allowedMimes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/gif'];
+  if (!allowedMimes.includes(req.file.mimetype)) {
+    fail('Please upload a valid image (PNG, JPG, SVG, WebP, or GIF).');
+  }
+
+  const base64 = req.file.buffer.toString('base64');
+  const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+  const current = await getCompanyBranding();
+  const updated = {
+    ...current,
+    logoUrl: dataUrl,
+    hasLogo: true,
+    updatedAt: new Date().toISOString()
+  };
+
+  await transaction(async c => {
+    await c.execute(
+      "UPDATE application_settings SET settings=JSON_SET(settings, '$.companyBranding', JSON_EXTRACT(?, '$')) WHERE id=1",
+      [JSON.stringify(updated)]
+    );
+    await c.execute(
+      'INSERT INTO audit_events (actor, action, details) VALUES (?, ?, ?)',
+      [req.user.email, 'COMPANY_LOGO_UPLOADED', JSON.stringify({ sizeBytes: req.file.size, mime: req.file.mimetype })]
+    );
+  });
+
+  res.json({ success: true, branding: updated, logoUrl: dataUrl });
+});
+
+// Management deletes company logo
+agreementTemplateRoutes.delete('/settings/branding/logo', permit('ADMIN', 'MANAGER'), async (req, res) => {
+  const current = await getCompanyBranding();
+  const updated = {
+    ...current,
+    logoUrl: '',
+    hasLogo: false,
+    updatedAt: new Date().toISOString()
+  };
+
+  await transaction(async c => {
+    await c.execute(
+      "UPDATE application_settings SET settings=JSON_SET(settings, '$.companyBranding', JSON_EXTRACT(?, '$')) WHERE id=1",
+      [JSON.stringify(updated)]
+    );
+    await c.execute(
+      'INSERT INTO audit_events (actor, action, details) VALUES (?, ?, ?)',
+      [req.user.email, 'COMPANY_LOGO_REMOVED', JSON.stringify({})]
+    );
+  });
+
+  res.json({ success: true, branding: updated });
+});
 
 // Staff can read templates (used in Settings and file Category Change modal)
 agreementTemplateRoutes.get('/agreement-templates', permit('ADMIN', 'MANAGER', 'AGENT'), async (req, res) => {

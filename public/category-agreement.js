@@ -126,6 +126,56 @@ function interpolateAgreementText(templateBody, vars, isPreview = false) {
     .replace(/\{\{\s*portal_url\s*\}\}/gi, wrap(vars.portal_url || location.origin, 'Portal URL'));
 }
 
+let cachedCompanyBranding = null;
+
+async function loadCompanyBranding(forceRefresh = false) {
+  if (cachedCompanyBranding && !forceRefresh) return cachedCompanyBranding;
+  try {
+    const res = await api('branding');
+    cachedCompanyBranding = {
+      companyName: res?.companyName || 'Operations Immigration & Legal Services',
+      documentSubtitle: res?.documentSubtitle || 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT',
+      logoUrl: res?.logoUrl || '',
+      hasLogo: Boolean(res?.logoUrl)
+    };
+  } catch (err) {
+    cachedCompanyBranding = {
+      companyName: 'Operations Immigration & Legal Services',
+      documentSubtitle: 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT',
+      logoUrl: '',
+      hasLogo: false
+    };
+  }
+  globalThis.companyBranding = cachedCompanyBranding;
+  return cachedCompanyBranding;
+}
+
+function renderMiniLetterheadPreview(brandingData) {
+  const cName = (brandingData?.companyName || 'Operations Immigration & Legal Services').trim();
+  const cSub = (brandingData?.documentSubtitle || 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT').trim();
+  const hasLogo = Boolean(brandingData?.logoUrl);
+
+  return `
+    <div class="mini-letterhead-content">
+      <div class="mini-brand-row">
+        ${hasLogo
+          ? `<div class="mini-logo-container"><img src="${esc(brandingData.logoUrl)}" class="mini-logo-img" alt="Logo" /></div>`
+          : `<div class="mini-emblem">${esc((cName.charAt(0) || '⚖').toUpperCase())}</div>`
+        }
+        <div class="mini-text-stack">
+          <span class="mini-title">${esc(cName.toUpperCase())}</span>
+          <span class="mini-subtitle">${esc(cSub.toUpperCase())}</span>
+        </div>
+      </div>
+      <div class="mini-meta-badge">
+        <span class="mini-meta-lbl">DOCUMENT REF</span>
+        <span class="mini-meta-code">AGR-SAMPLE-REV</span>
+        <span class="mini-meta-dt">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+      </div>
+    </div>
+  `;
+}
+
 function defaultAgreementText(file, targetCategoryName, targetVersion) {
   return 'richtext:v1:<h3>1. Scope of Service Modification</h3><p>This Service Change Agreement &amp; Addendum (&quot;Addendum&quot;) modifies the scope of services previously agreed upon between the Client and Operations. Both parties agree that the client\'s file will be transitioned to the Proposed New Category indicated above.</p><h3>2. Modification of Requirements &amp; Document Checklist</h3><p>Upon execution of this Addendum by the Client:</p><ol><li>The existing document checklist will be archived and retained in the file history.</li><li>A revised document and information checklist for <strong>' + esc(targetCategoryName) + ' (v' + esc(targetVersion) + ')</strong> will take effect immediately.</li><li>Any previously approved items incompatible with the new category will be superseded.</li><li>File progression, reviews, and document collection are temporarily held until this Addendum is executed or cancelled by Operations.</li></ol><h3>3. Client Authorization &amp; Consent</h3><p>By signing below, the Client confirms that they have reviewed and agreed to the terms of this service transition, and authorize Operations to update the service checklist and requirements for this file.</p><p><em>All other terms, conditions, and obligations of the initial service engagement remain in full force and effect.</em></p>';
 }
@@ -135,6 +185,16 @@ function formatA4DocumentHtml(title, rawBody, meta = {}, options = {}) {
   const docTitle = (title || 'Service Change Agreement & Addendum').trim();
   const docRef = meta.ref_code || (meta.file_id ? `AGR-${meta.file_id}-REV` : 'AGR-DOC-101');
   const docDate = meta.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const branding = meta.branding || options.branding || globalThis.companyBranding || cachedCompanyBranding || {
+    companyName: 'Operations Immigration & Legal Services',
+    documentSubtitle: 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT',
+    logoUrl: '',
+    hasLogo: false
+  };
+  const orgTitle = (branding.companyName || 'Operations Immigration & Legal Services').trim();
+  const orgSubtitle = (branding.documentSubtitle || 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT').trim();
+  const hasCustomLogo = Boolean(branding.logoUrl);
 
   // 1. Process body into sanitized HTML with placeholders interpolated
   const cleanBody = ensureRichAgreementBody(rawBody);
@@ -355,7 +415,7 @@ function formatA4DocumentHtml(title, rawBody, meta = {}, options = {}) {
             </div>
             <div class="a4-sig-line"></div>
             <div class="a4-sig-details">
-              <div><strong>Representative:</strong> Operations Department</div>
+              <div><strong>Entity:</strong> ${esc(orgTitle)}</div>
               <div><strong>Status:</strong> Authorized &amp; Issued</div>
               <div><strong>Date:</strong> ${esc(docDate)}</div>
             </div>
@@ -373,13 +433,17 @@ function formatA4DocumentHtml(title, rawBody, meta = {}, options = {}) {
     let pageHeaderHtml = '';
 
     if (p === 0) {
+      const emblemHtml = hasCustomLogo
+        ? `<div class="a4-logo-container"><img src="${esc(branding.logoUrl)}" class="a4-company-logo" alt="${esc(orgTitle)} Logo" /></div>`
+        : `<div class="a4-emblem" aria-hidden="true">${esc((orgTitle.charAt(0) || '⚖').toUpperCase())}</div>`;
+
       pageHeaderHtml = `
         <div class="a4-letterhead">
           <div class="a4-letterhead-brand">
-            <div class="a4-emblem" aria-hidden="true">⚖️</div>
+            ${emblemHtml}
             <div class="a4-brand-text">
-              <span class="a4-org-title">OPERATIONS IMMIGRATION &amp; LEGAL SERVICES</span>
-              <span class="a4-org-subtitle">OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT</span>
+              <span class="a4-org-title">${esc(orgTitle.toUpperCase())}</span>
+              <span class="a4-org-subtitle">${esc(orgSubtitle.toUpperCase())}</span>
             </div>
           </div>
           <div class="a4-doc-meta-badge">
@@ -558,6 +622,7 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
     modal('No categories available', empty('No published categories', 'Publish another service category first before requesting a category change.'));
     return;
   }
+  await loadCompanyBranding();
   let templates = [];
   try {
     templates = await api('agreement-templates');
@@ -684,7 +749,8 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
   });
 }
 
-function openEditAgreementModal(file, pendingReq, onComplete) {
+async function openEditAgreementModal(file, pendingReq, onComplete) {
+  await loadCompanyBranding();
   modal('Edit Service Change Agreement', `
     <div class="category-request-form-shell">
       <div class="notice">
@@ -783,7 +849,8 @@ function openCancelAgreementModal(file, pendingReq, onComplete) {
   });
 }
 
-function openSignatureModal(file, pendingReq, onComplete) {
+async function openSignatureModal(file, pendingReq, onComplete) {
+  await loadCompanyBranding();
   const metaVars = {
     client_name: file.client_name,
     file_id: file.id,
@@ -881,7 +948,8 @@ function openSignatureModal(file, pendingReq, onComplete) {
   }
 }
 
-function openViewSignedAgreementModal(req) {
+async function openViewSignedAgreementModal(req) {
+  await loadCompanyBranding();
   const sig = req.signature_data || {};
   const metaVars = {
     client_name: sig.typedName || 'Client',
@@ -1009,41 +1077,275 @@ function renderAgreementHistory(changeRequests) {
 let selectedAgreementTemplateId = null;
 
 async function renderAgreementTemplateSettings() {
-  const templates = await api('agreement-templates');
+  const [templates, branding] = await Promise.all([
+    api('agreement-templates'),
+    loadCompanyBranding(true)
+  ]);
+
   if (!selectedAgreementTemplateId || !templates.some(t => String(t.id) === String(selectedAgreementTemplateId))) {
     selectedAgreementTemplateId = (templates.find(t => t.is_default) || templates[0])?.id || null;
   }
 
-  content.insertAdjacentHTML('beforeend', card(
-    'Category change agreements',
-    '<div class="agreement-builder-intro">' +
-      '<div class="intro-icon" aria-hidden="true">💡</div>' +
-      '<div class="intro-text">' +
-        '<h4>How Category Change Agreements Work</h4>' +
-        '<p>When staff initiates a category change on any client file, the file is automatically placed on hold and this agreement is sent to the client. Requirements only change once the client electronically signs.</p>' +
-        '<div class="intro-steps">' +
-          '<span class="intro-step"><strong>1. Edit terms:</strong> Format clauses directly like Word or Google Docs.</span>' +
-          '<span class="intro-step"><strong>2. Insert fields:</strong> Use Smart Buttons (Client Name, File #) to inject live file data.</span>' +
-          '<span class="intro-step"><strong>3. Live preview:</strong> Inspect the authentic A4 multi-page document on the right.</span>' +
-        '</div>' +
-      '</div>' +
-    '</div>' +
-    '<div class="template-selection">' +
-      '<label>Choose agreement template' +
-        '<select id="agreement-template-choice" aria-label="Agreement template">' +
-          templates.map(t => '<option value="' + t.id + '">' + esc(t.name) + (t.is_default ? ' · Default' : '') + '</option>').join('') +
-        '</select>' +
-      '</label>' +
-      '<button id="new-agreement-template">＋ New agreement template</button>' +
-    '</div>' +
-    '<div id="agreement-template-editor"></div>'
-  ));
+  let activeSettingsPreview = null;
 
-  const section = content.lastElementChild;
+  const section = document.createElement('div');
   section.id = 'agreement-templates';
+  section.className = 'agreements-settings-wrapper';
+
+  const brandingCardHtml = `
+    <section class="card company-branding-card" id="company-branding-section">
+      <div class="branding-card-header">
+        <div class="branding-header-text">
+          <h2>Company branding &amp; agreement letterhead</h2>
+          <p class="muted">Upload your organization logo and define legal document headers. These appear at the top of all Category Change Agreements, client review portals, and PDF downloads.</p>
+        </div>
+        <div class="branding-header-badge">
+          <span id="branding-status-pill" class="badge ${branding.hasLogo ? 'accepted' : 'neutral'}">${branding.hasLogo ? 'Custom Logo Active' : 'Default Emblem'}</span>
+        </div>
+      </div>
+
+      <div class="branding-grid">
+        <div class="branding-inputs-col">
+          <div class="branding-field-group">
+            <label for="branding-company-name"><strong>Company / Organization Legal Name</strong></label>
+            <input type="text" id="branding-company-name" value="${esc(branding.companyName || '')}" placeholder="e.g. Operations Immigration &amp; Legal Services" maxlength="200" required />
+            <span class="hint">Appears in bold uppercase on the letterhead and in the authorized officer signature block.</span>
+          </div>
+
+          <div class="branding-field-group">
+            <label for="branding-document-subtitle"><strong>Document Subtitle / Legal Tagline</strong></label>
+            <input type="text" id="branding-document-subtitle" value="${esc(branding.documentSubtitle || '')}" placeholder="e.g. OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT" maxlength="200" />
+            <span class="hint">Appears directly beneath your company name on the letterhead.</span>
+          </div>
+
+          <div class="branding-field-group logo-management-group">
+            <label><strong>Company Logo</strong></label>
+            <div class="logo-uploader-box">
+              <input type="file" id="branding-logo-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" />
+              <div class="logo-uploader-status-row">
+                <div id="branding-logo-thumb-wrapper" class="logo-thumb-wrapper">
+                  ${branding.logoUrl
+                    ? `<img src="${esc(branding.logoUrl)}" id="branding-thumb-img" alt="Current Company Logo" />`
+                    : `<div class="logo-thumb-placeholder" id="branding-thumb-empty"><span class="empty-icon">🏢</span><span>No Logo</span></div>`
+                  }
+                </div>
+                <div class="logo-uploader-controls">
+                  <button type="button" id="branding-upload-btn" class="secondary">
+                    <span class="upload-icon">📁</span> Upload new logo image
+                  </button>
+                  <div id="branding-remove-container">
+                    ${branding.logoUrl ? `<button type="button" id="branding-remove-btn" class="danger-button small">Remove custom logo</button>` : ''}
+                  </div>
+                  <span class="hint logo-specs-hint">Supported formats: PNG, JPG, WebP, SVG, GIF (max 4 MB). Recommended transparent PNG or SVG.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="branding-actions-row">
+            <button type="button" id="branding-save-info-btn" class="primary">Save Company Branding</button>
+            <span id="branding-live-save-indicator" class="branding-indicator" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <div class="branding-preview-col">
+          <div class="branding-preview-card">
+            <div class="branding-preview-card-title">
+              <span>Letterhead Live Preview</span>
+              <span class="preview-mini-pill">A4 Simulation</span>
+            </div>
+            <div class="branding-mini-letterhead" id="branding-mini-preview">
+              ${renderMiniLetterheadPreview(branding)}
+            </div>
+            <p class="branding-preview-hint">💡 Changes to your company name, subtitle, or logo update both this preview and the multi-page A4 document below in real time.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+
+  const templatesCardHtml = card(
+    'Category change agreements',
+    `<div class="agreement-builder-intro">
+      <div class="intro-icon" aria-hidden="true">💡</div>
+      <div class="intro-text">
+        <h4>How Category Change Agreements Work</h4>
+        <p>When staff initiates a category change on any client file, the file is automatically placed on hold and this agreement is sent to the client. Requirements only change once the client electronically signs.</p>
+        <div class="intro-steps">
+          <span class="intro-step"><strong>1. Edit terms:</strong> Format clauses directly like Word or Google Docs.</span>
+          <span class="intro-step"><strong>2. Insert fields:</strong> Use Smart Buttons (Client Name, File #) to inject live file data.</span>
+          <span class="intro-step"><strong>3. Live preview:</strong> Inspect the authentic A4 multi-page document on the right.</span>
+        </div>
+      </div>
+    </div>
+    <div class="template-selection">
+      <label>Choose agreement template
+        <select id="agreement-template-choice" aria-label="Agreement template">
+          ${templates.map(t => '<option value="' + t.id + '">' + esc(t.name) + (t.is_default ? ' · Default' : '') + '</option>').join('')}
+        </select>
+      </label>
+      <button id="new-agreement-template">＋ New agreement template</button>
+    </div>
+    <div id="agreement-template-editor"></div>`
+  );
+
+  section.innerHTML = brandingCardHtml + templatesCardHtml;
+  content.appendChild(section);
+
   const headerActions = document.querySelector('#header-actions');
   if (headerActions && !headerActions.querySelector('#jump-agreement-templates')) {
-    headerActions.insertAdjacentHTML('beforeend', '<button id="jump-agreement-templates">Category agreements</button>');
+    headerActions.insertAdjacentHTML('beforeend', '<button id="jump-agreement-templates">Agreements &amp; branding</button>');
+  }
+
+  // Bind branding controls
+  const nameInput = section.querySelector('#branding-company-name');
+  const subInput = section.querySelector('#branding-document-subtitle');
+  const miniPreview = section.querySelector('#branding-mini-preview');
+  const thumbWrapper = section.querySelector('#branding-logo-thumb-wrapper');
+  const removeContainer = section.querySelector('#branding-remove-container');
+  const statusPill = section.querySelector('#branding-status-pill');
+  const uploadBtn = section.querySelector('#branding-upload-btn');
+  const fileInput = section.querySelector('#branding-logo-file-input');
+  const saveBtn = section.querySelector('#branding-save-info-btn');
+  const saveIndicator = section.querySelector('#branding-live-save-indicator');
+
+  function updateMiniPreview() {
+    if (miniPreview) {
+      miniPreview.innerHTML = renderMiniLetterheadPreview(cachedCompanyBranding);
+    }
+  }
+
+  function updateBrandingStatusPill() {
+    if (statusPill) {
+      statusPill.className = `badge ${cachedCompanyBranding.hasLogo ? 'accepted' : 'neutral'}`;
+      statusPill.textContent = cachedCompanyBranding.hasLogo ? 'Custom Logo Active' : 'Default Emblem';
+    }
+  }
+
+  function renderThumb() {
+    if (!thumbWrapper) return;
+    if (cachedCompanyBranding.logoUrl) {
+      thumbWrapper.innerHTML = `<img src="${esc(cachedCompanyBranding.logoUrl)}" id="branding-thumb-img" alt="Current Company Logo" />`;
+    } else {
+      thumbWrapper.innerHTML = `<div class="logo-thumb-placeholder" id="branding-thumb-empty"><span class="empty-icon">🏢</span><span>No Logo</span></div>`;
+    }
+  }
+
+  function bindRemoveButton() {
+    if (!removeContainer) return;
+    if (cachedCompanyBranding.logoUrl) {
+      removeContainer.innerHTML = `<button type="button" id="branding-remove-btn" class="danger-button small">Remove custom logo</button>`;
+      const removeBtn = removeContainer.querySelector('#branding-remove-btn');
+      if (removeBtn) {
+        removeBtn.onclick = async () => {
+          if (!confirm('Remove custom logo and restore the default emblem on agreements?')) return;
+          removeBtn.disabled = true;
+          try {
+            await api('settings/branding/logo', 'DELETE');
+            cachedCompanyBranding.logoUrl = '';
+            cachedCompanyBranding.hasLogo = false;
+            globalThis.companyBranding = cachedCompanyBranding;
+
+            renderThumb();
+            bindRemoveButton();
+            updateBrandingStatusPill();
+            updateMiniPreview();
+            if (activeSettingsPreview) activeSettingsPreview();
+            success('Custom logo removed. Default company emblem restored.');
+          } catch (err) {
+            report(err);
+          } finally {
+            removeBtn.disabled = false;
+          }
+        };
+      }
+    } else {
+      removeContainer.innerHTML = '';
+    }
+  }
+
+  bindRemoveButton();
+
+  if (uploadBtn && fileInput) {
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      if (file.size > 4 * 1024 * 1024) {
+        report(new Error('Selected logo exceeds 4MB limit. Please choose a smaller image file.'));
+        fileInput.value = '';
+        return;
+      }
+      uploadBtn.disabled = true;
+      uploadBtn.innerHTML = '<span class="upload-icon">⏳</span> Uploading logo…';
+      try {
+        const fd = new FormData();
+        fd.append('logo', file);
+        const res = await api('settings/branding/logo', 'POST', fd);
+
+        cachedCompanyBranding.logoUrl = res.logoUrl;
+        cachedCompanyBranding.hasLogo = true;
+        globalThis.companyBranding = cachedCompanyBranding;
+
+        renderThumb();
+        bindRemoveButton();
+        updateBrandingStatusPill();
+        updateMiniPreview();
+        if (activeSettingsPreview) activeSettingsPreview();
+        success('Company logo uploaded successfully! Letterheads updated.');
+      } catch (err) {
+        report(err);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<span class="upload-icon">📁</span> Upload new logo image';
+        fileInput.value = '';
+      }
+    };
+  }
+
+  const handleTextChange = () => {
+    cachedCompanyBranding.companyName = nameInput ? nameInput.value.trim() || 'Operations Immigration & Legal Services' : 'Operations Immigration & Legal Services';
+    cachedCompanyBranding.documentSubtitle = subInput ? subInput.value.trim() || 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT' : 'OFFICIAL ADDENDUM TO SERVICE ENGAGEMENT';
+    globalThis.companyBranding = cachedCompanyBranding;
+
+    updateMiniPreview();
+    if (activeSettingsPreview) activeSettingsPreview();
+  };
+
+  if (nameInput) nameInput.addEventListener('input', handleTextChange);
+  if (subInput) subInput.addEventListener('input', handleTextChange);
+
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      const companyName = nameInput ? nameInput.value.trim() : '';
+      const documentSubtitle = subInput ? subInput.value.trim() : '';
+      if (!companyName) {
+        report(new Error('Company name cannot be blank.'));
+        nameInput?.focus();
+        return;
+      }
+      saveBtn.disabled = true;
+      if (saveIndicator) saveIndicator.textContent = 'Saving…';
+      try {
+        const res = await api('settings/branding', 'PUT', { companyName, documentSubtitle });
+        cachedCompanyBranding.companyName = res.branding.companyName;
+        cachedCompanyBranding.documentSubtitle = res.branding.documentSubtitle;
+        globalThis.companyBranding = cachedCompanyBranding;
+
+        updateMiniPreview();
+        if (activeSettingsPreview) activeSettingsPreview();
+        if (saveIndicator) {
+          saveIndicator.textContent = 'Saved!';
+          setTimeout(() => { if (saveIndicator) saveIndicator.textContent = ''; }, 3000);
+        }
+        success('Company branding saved successfully.');
+      } catch (err) {
+        if (saveIndicator) saveIndicator.textContent = '';
+        report(err);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    };
   }
 
   const choice = section.querySelector('#agreement-template-choice');
@@ -1175,6 +1477,8 @@ async function renderAgreementTemplateSettings() {
         { mode: 'preview', highlightTokens: true }
       );
     }
+
+    activeSettingsPreview = updateSettingsPreview;
 
     let previewTimer = null;
     const schedulePreview = () => {
