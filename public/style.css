@@ -148,3 +148,482 @@ html[data-theme=dark] .link-button{color:#5ccdbf}
 html[data-theme=dark] .link-button:hover:not(:disabled){color:#8be3d7}
 html[data-theme=dark] .login-feedback.success{background:#1a362b;color:#a3e7c8;border-color:#2a5745}
 html[data-theme=dark] .login-feedback.error{background:#381f21;color:#f7b1ab;border-color:#5c2d31}
+
+/* ============================================================
+   Category Change Agreement & File Hold Styles (Option B)
+   ============================================================ */
+
+.category-hold-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid #fcd34d;
+  border-left: 5px solid #d97706;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);
+}
+.hold-banner-indicator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fde68a;
+  color: #b45309;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.hold-pulse-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d97706;
+  animation: pulse-ring 2s infinite ease-out;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.9); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.4; }
+  100% { transform: scale(0.9); opacity: 1; }
+}
+.hold-banner-content {
+  flex: 1;
+}
+.hold-banner-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.hold-eyebrow {
+  color: #b45309;
+  font-weight: 700;
+  letter-spacing: .06em;
+  font-size: 11px;
+}
+.category-hold-banner h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: #78350f;
+  font-weight: 700;
+}
+.category-hold-banner p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #92400e;
+}
+.hold-banner-controls {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.hold-banner-controls button {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.client-agreement-banner {
+  background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+  border: 1px solid #7dd3fc;
+  border-left: 5px solid #0284c7;
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.08);
+}
+.client-agreement-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.client-agreement-eyebrow {
+  color: #0369a1;
+  font-weight: 700;
+  letter-spacing: .06em;
+  font-size: 11px;
+}
+.client-agreement-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.client-agreement-icon-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #bae6fd;
+  color: #0369a1;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+.client-agreement-copy h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #0c4a6e;
+  font-weight: 700;
+}
+.client-agreement-copy p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #0369a1;
+}
+.client-agreement-action-row {
+  display: flex;
+  justify-content: flex-start;
+}
+.pulse-btn {
+  box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4);
+  animation: pulse-shadow 2s infinite;
+}
+@keyframes pulse-shadow {
+  0% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(2, 132, 199, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
+}
+
+.agreement-signing-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 680px;
+  width: 100%;
+}
+.agreement-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  padding-bottom: 12px;
+}
+.agreement-modal-header h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.agreement-modal-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #64748b);
+}
+.agreement-scroll-box {
+  max-height: 220px;
+  overflow-y: auto;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.agreement-preformatted {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.signature-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+.signature-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+}
+.signature-input-label input {
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+.signature-pad-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.signature-pad-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+}
+.canvas-wrap {
+  position: relative;
+  background: #ffffff;
+  border: 2px dashed #94a3b8;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+.canvas-wrap:focus-within,
+.canvas-wrap:hover {
+  border-color: #0284c7;
+}
+#signature-canvas {
+  display: block;
+  width: 100%;
+  height: 140px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.canvas-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #94a3b8;
+  font-size: 12px;
+  pointer-events: none;
+  user-select: none;
+}
+.agreement-consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text, #1e293b);
+  cursor: pointer;
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+.agreement-consent-row input[type=checkbox] {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #0284c7;
+}
+.audit-notice-row {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.signature-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.hold-notice-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.hold-notice-box .hold-icon {
+  font-size: 24px;
+  color: #d97706;
+}
+.hold-notice-box strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: #1e293b;
+}
+.hold-notice-box p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.agreement-history-card {
+  margin-top: 24px;
+}
+.agreement-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.agreement-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: border-color .15s;
+}
+.agreement-history-item.signed {
+  border-left: 4px solid #10b981;
+}
+.agreement-history-item.cancelled {
+  border-left: 4px solid #94a3b8;
+  opacity: .85;
+}
+.agreement-history-item.pending {
+  border-left: 4px solid #f59e0b;
+}
+.agreement-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agreement-item-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text, #1e293b);
+}
+.agreement-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.view-agreement-btn {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.view-agreement-btn:hover {
+  text-decoration: underline;
+}
+
+.signed-evidence-box, .cancelled-evidence-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 10px;
+}
+.signed-evidence-box h4, .cancelled-evidence-box h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #475569;
+}
+.signature-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.evidence-label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+.signed-signature-image {
+  max-width: 240px;
+  max-height: 80px;
+  display: block;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px;
+}
+
+html[data-theme=dark] .category-hold-banner {
+  background: linear-gradient(135deg, #2d2410 0%, #3d2f10 100%);
+  border-color: #634b15;
+  border-left-color: #f59e0b;
+}
+html[data-theme=dark] .hold-banner-indicator {
+  background: #4a3814;
+  color: #fcd34d;
+}
+html[data-theme=dark] .hold-eyebrow {
+  color: #fcd34d;
+}
+html[data-theme=dark] .category-hold-banner h3 {
+  color: #fef3c7;
+}
+html[data-theme=dark] .category-hold-banner p {
+  color: #fde68a;
+}
+html[data-theme=dark] .client-agreement-banner {
+  background: linear-gradient(135deg, #0c2838 0%, #0d344d 100%);
+  border-color: #0369a1;
+  border-left-color: #38bdf8;
+}
+html[data-theme=dark] .client-agreement-icon-shell {
+  background: #0369a1;
+  color: #e0f2fe;
+}
+html[data-theme=dark] .client-agreement-eyebrow {
+  color: #38bdf8;
+}
+html[data-theme=dark] .client-agreement-copy h2 {
+  color: #f0f9ff;
+}
+html[data-theme=dark] .client-agreement-copy p {
+  color: #bae6fd;
+}
+html[data-theme=dark] .agreement-scroll-box {
+  background: #0f172a;
+  border-color: #334155;
+}
+html[data-theme=dark] .agreement-preformatted {
+  color: #cbd5e1;
+}
+html[data-theme=dark] .agreement-consent-row {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+html[data-theme=dark] .hold-notice-box {
+  background: #0f172a;
+  border-color: #334155;
+}
+html[data-theme=dark] .hold-notice-box strong {
+  color: #f1f5f9;
+}
+html[data-theme=dark] .hold-notice-box p {
+  color: #94a3b8;
+}
+html[data-theme=dark] .agreement-history-item {
+  background: #1e293b;
+  border-color: #334155;
+}
+html[data-theme=dark] .signed-evidence-box,
+html[data-theme=dark] .cancelled-evidence-box {
+  background: #0f172a;
+  border-color: #334155;
+}
+html[data-theme=dark] .signed-evidence-box h4,
+html[data-theme=dark] .cancelled-evidence-box h4 {
+  color: #94a3b8;
+}
+html[data-theme=dark] .view-agreement-btn {
+  color: #38bdf8;
+}
