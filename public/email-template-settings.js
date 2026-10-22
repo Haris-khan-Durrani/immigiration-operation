@@ -1,10 +1,10 @@
 let selectedEmailTemplate='login_new';
 let selectedSettingsTab=sessionStorage.getItem('operations-settings-tab')||'connection';
 async function settings(){
- await baseSettings();await renderEmailTemplateSettings();
+ await baseSettings();await renderEmailTemplateSettings();await renderAgreementTemplateSettings();
  const children=[...content.children],columns=content.querySelector('.settings-columns');
  const find=title=>children.find(e=>e.querySelector('h2')?.textContent===title)||[...(columns?.querySelectorAll('.card')||[])].find(e=>e.querySelector('h2')?.textContent===title);
- const groups=[['connection','Contract Manager',[children[0]]],['crm','CRM & storage',[find('CRM connection'),find('Document storage')]],['delivery','Email delivery',[find('Email delivery')]],['templates','Email templates',[document.querySelector('#email-templates')]],['advanced','Legacy intake',[find('Legacy summary sender rules')]]];
+ const groups=[['connection','Contract Manager',[children[0]]],['crm','CRM & storage',[find('CRM connection'),find('Document storage')]],['delivery','Email delivery',[find('Email delivery')]],['templates','Email templates',[document.querySelector('#email-templates')]],['agreements','Category agreements',[document.querySelector('#agreement-templates')]],['advanced','Legacy intake',[find('Legacy summary sender rules')]]];
  const nav=document.createElement('div');nav.className='settings-tabs';nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Settings sections');content.prepend(nav);
  const panels=[];
  for(const [key,label,nodes] of groups){const panel=document.createElement('div');panel.id='settings-panel-'+key;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','settings-tab-'+key);nodes.filter(Boolean).forEach(n=>panel.append(n));content.append(panel);panels.push([key,panel]);const button=document.createElement('button');button.id='settings-tab-'+key;button.type='button';button.setAttribute('role','tab');button.setAttribute('aria-controls',panel.id);button.textContent=label;button.onclick=()=>activate(key);nav.append(button);}
@@ -12,7 +12,8 @@ async function settings(){
  function activate(key){selectedSettingsTab=key;sessionStorage.setItem('operations-settings-tab',key);panels.forEach(([id,panel])=>{panel.hidden=id!==key;});[...nav.children].forEach((b,i)=>{const active=groups[i][0]===key;b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});}
  nav.onkeydown=e=>{if(!['ArrowRight','ArrowLeft','Home','End'].includes(e.key))return;e.preventDefault();const buttons=[...nav.children],i=buttons.indexOf(document.activeElement);const n=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[n].click();buttons[n].focus();};
  activate(groups.some(g=>g[0]===selectedSettingsTab)?selectedSettingsTab:'connection');
- document.querySelector('#jump-email-templates').onclick=()=>activate('templates');
+ if(document.querySelector('#jump-email-templates')) document.querySelector('#jump-email-templates').onclick=()=>activate('templates');
+ if(document.querySelector('#jump-agreement-templates')) document.querySelector('#jump-agreement-templates').onclick=()=>activate('agreements');
 }
 async function renderEmailTemplateSettings(){
  const templates=await api('settings/email-templates');

@@ -1,6 +1,7 @@
 import {internalWorkRoutes} from './internal-work.js';
 import {statusReminderRoutes} from './status-reminders.js';
 import {emailTemplateRoutes} from './email-templates.js';
+import {agreementTemplateRoutes} from './agreement-templates.js';
 import {passwordResetRoutes} from './password-reset.js';
 import express from 'express';
 import helmet from 'helmet';
@@ -36,6 +37,7 @@ app.use('/api',publicRoutes);
 app.use('/api',authenticate);
 app.use('/api',emailRoutes);
 app.use('/api',emailTemplateRoutes);
+app.use('/api',agreementTemplateRoutes);
 app.use('/api',connectionRoutes);
 app.get('/api/auth/me',(req,res)=>res.json(req.user));
 app.post('/api/auth/logout',logout);
