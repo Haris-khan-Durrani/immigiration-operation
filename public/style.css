@@ -629,6 +629,46 @@ html[data-theme=dark] .view-agreement-btn {
 }
 
 /* Agreement Templates & A4 Page Document System */
+.agreement-builder-intro {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.agreement-builder-intro .intro-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.agreement-builder-intro .intro-text h4 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #166534;
+}
+.agreement-builder-intro .intro-text p {
+  margin: 0 0 10px 0;
+  font-size: 12.5px;
+  color: #15803d;
+  line-height: 1.5;
+}
+.agreement-builder-intro .intro-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.agreement-builder-intro .intro-step {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  color: #14532d;
+}
+
 .agreement-template-grid {
   display: grid;
   grid-template-columns: minmax(380px, 1fr) minmax(420px, 1.2fr);
@@ -636,35 +676,129 @@ html[data-theme=dark] .view-agreement-btn {
   align-items: start;
   margin-top: 16px;
 }
-.template-token-list {
+
+/* Smart Client Fields */
+.builder-smart-fields {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 12px 0 16px;
+}
+.smart-fields-header {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.smart-fields-title {
+  display: flex;
   align-items: center;
   gap: 6px;
-  margin: 10px 0 14px;
+  font-size: 12.5px;
+  color: #0f172a;
 }
-.template-token-list strong {
-  font-size: 12px;
-  color: #475569;
-  margin-right: 4px;
+.smart-sparkle-icon {
+  font-size: 14px;
 }
-.template-token-list button {
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+.smart-helper-pill {
+  font-size: 10px;
+  font-weight: 600;
+  background: #e0f2fe;
+  color: #0284c7;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.smart-fields-hint {
   font-size: 11px;
-  font-weight: 500;
-  color: #0369a1;
+  color: #64748b;
+}
+.smart-fields-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.smart-token-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 5px 12px;
   cursor: pointer;
   transition: all .15s ease;
+  user-select: none;
 }
-.template-token-list button:hover {
+.smart-token-btn:hover {
   background: #e0f2fe;
   border-color: #38bdf8;
-  color: #0284c7;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.12);
 }
+.smart-token-btn:active {
+  transform: scale(0.98);
+}
+.smart-token-btn .tok-icon {
+  font-size: 13px;
+}
+.smart-token-btn .tok-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.smart-token-btn .tok-code {
+  font-size: 9.5px;
+  color: #0284c7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* Pre-made Legal Clause Inserter */
+.builder-clause-helper {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.clause-helper-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.clause-helper-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #334155;
+  white-space: nowrap;
+}
+.clause-icon {
+  font-size: 14px;
+}
+.clause-select {
+  flex: 1;
+  min-width: 240px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 12px;
+  background: #ffffff;
+}
+.clause-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 .agreement-default-checkbox {
   display: inline-flex;
   align-items: center;
@@ -673,6 +807,63 @@ html[data-theme=dark] .view-agreement-btn {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+}
+
+.agreement-template-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.reset-template-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+/* Sample Tokens in Live Preview */
+.a4-sample-token {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-bottom: 1.5px dashed #0284c7;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  display: inline;
+  cursor: help;
+  transition: all .15s ease;
+}
+.a4-sample-token:hover {
+  background: #bae6fd;
+}
+
+/* Preview Actions & Header */
+.preview-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preview-action-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0369a1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all .15s ease;
+}
+.preview-action-btn:hover {
+  background: #e0f2fe;
+  border-color: #38bdf8;
 }
 
 /* Agreement Preview Column & Viewport */
@@ -1296,17 +1487,69 @@ html[data-theme=dark] .view-agreement-btn {
 }
 
 /* Dark mode for Agreement Templates & A4 Desk */
-html[data-theme=dark] .template-token-list strong {
+html[data-theme=dark] .agreement-builder-intro {
+  background: rgba(6, 78, 59, 0.25);
+  border-color: #065f46;
+}
+html[data-theme=dark] .agreement-builder-intro .intro-text h4 {
+  color: #34d399;
+}
+html[data-theme=dark] .agreement-builder-intro .intro-text p {
+  color: #6ee7b7;
+}
+html[data-theme=dark] .agreement-builder-intro .intro-step {
+  background: #0f172a;
+  border-color: #059669;
+  color: #a7f3d0;
+}
+html[data-theme=dark] .builder-smart-fields,
+html[data-theme=dark] .builder-clause-helper {
+  background: #1e293b;
+  border-color: #334155;
+}
+html[data-theme=dark] .smart-fields-title {
+  color: #f1f5f9;
+}
+html[data-theme=dark] .smart-fields-hint,
+html[data-theme=dark] .clause-helper-label {
   color: #94a3b8;
 }
-html[data-theme=dark] .template-token-list button {
+html[data-theme=dark] .smart-token-btn {
+  background: #0f172a;
+  border-color: #334155;
+}
+html[data-theme=dark] .smart-token-btn .tok-label {
+  color: #f1f5f9;
+}
+html[data-theme=dark] .smart-token-btn .tok-code {
+  background: #1e293b;
+  color: #38bdf8;
+}
+html[data-theme=dark] .smart-token-btn:hover {
+  background: #1e293b;
+  border-color: #0284c7;
+}
+html[data-theme=dark] .clause-select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+html[data-theme=dark] .preview-action-btn {
   background: #1e293b;
   border-color: #334155;
   color: #38bdf8;
 }
-html[data-theme=dark] .template-token-list button:hover {
+html[data-theme=dark] .preview-action-btn:hover {
   background: #0f172a;
   border-color: #0284c7;
+}
+html[data-theme=dark] .a4-sample-token {
+  background: #0c4a6e;
+  color: #7dd3fc;
+  border-bottom-color: #38bdf8;
+}
+html[data-theme=dark] .a4-sample-token:hover {
+  background: #075985;
 }
 html[data-theme=dark] .agreement-template-preview-col,
 html[data-theme=dark] .modal-preview-card {

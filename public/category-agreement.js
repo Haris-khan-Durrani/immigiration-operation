@@ -1,19 +1,129 @@
-function interpolateAgreementText(templateBody, vars) {
+function ensureRichAgreementBody(raw) {
+  if (!raw) return '';
+  let str = String(raw).trim();
+  if (str.includes('\\n')) {
+    str = str.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+  }
+  str = str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  if (str.startsWith('richtext:v1:')) {
+    let inner = str.slice(12).trim();
+    if (inner.includes('\\n')) inner = inner.replace(/\\n/g, '\n');
+    if (/<(p|h[1-6]|ul|ol|table|div)[^>]*>/i.test(inner)) {
+      return 'richtext:v1:' + (globalThis.OperationsRichText ? OperationsRichText.sanitize(inner) : inner);
+    }
+    str = inner;
+  }
+
+  if (/<(p|h[1-6]|ul|ol|table|div)[^>]*>/i.test(str)) {
+    return 'richtext:v1:' + (globalThis.OperationsRichText ? OperationsRichText.sanitize(str) : str);
+  }
+
+  const blocks = str.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  const htmlBlocks = [];
+
+  for (const block of blocks) {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) continue;
+
+    const isNumbered = lines.length > 1 && lines.every(l => /^(\d+[\.\)]|[a-z][\.\)])\s+/i.test(l));
+    const isBullet = lines.length > 1 && lines.every(l => /^[-*•]\s+/.test(l));
+
+    if (isNumbered) {
+      htmlBlocks.push('<ol>' + lines.map(l => '<li>' + esc(l.replace(/^(\d+[\.\)]|[a-z][\.\)])\s+/i, '')) + '</li>').join('') + '</ol>');
+      continue;
+    }
+    if (isBullet) {
+      htmlBlocks.push('<ul>' + lines.map(l => '<li>' + esc(l.replace(/^[-*•]\s+/, '')) + '</li>').join('') + '</ul>');
+      continue;
+    }
+
+    const firstLine = lines[0];
+    const isHeading = (/^\d+\.\s+[A-Z]/i.test(firstLine) || /^[A-Z0-9\s&—–\-:]{5,}$/.test(firstLine) || /^Section\s+\d+/i.test(firstLine)) && firstLine.length < 90;
+
+    if (isHeading) {
+      htmlBlocks.push('<h3>' + esc(firstLine) + '</h3>');
+      if (lines.length > 1) {
+        const rest = lines.slice(1);
+        const restIsList = rest.every(l => /^([a-z0-9][\.\)]|[-*•])\s+/i.test(l));
+        if (restIsList) {
+          htmlBlocks.push('<ol>' + rest.map(l => '<li>' + esc(l.replace(/^([a-z0-9][\.\)]|[-*•])\s+/i, '')) + '</li>').join('') + '</ol>');
+        } else {
+          htmlBlocks.push('<p>' + rest.map(esc).join('<br>') + '</p>');
+        }
+      }
+      continue;
+    }
+
+    htmlBlocks.push('<p>' + lines.map(esc).join('<br>') + '</p>');
+  }
+
+  const resultHtml = htmlBlocks.length ? htmlBlocks.join('') : '<p>' + esc(str) + '</p>';
+  return 'richtext:v1:' + (globalThis.OperationsRichText ? OperationsRichText.sanitize(resultHtml) : resultHtml);
+}
+
+const STANDARD_AGREEMENT_CLAUSES = [
+  {
+    id: 'scope',
+    label: '1. Scope of Service Modification',
+    description: 'Transition file handling under updated program guidelines',
+    html: '<h3>1. Scope of Service Modification</h3><p>This Service Change Agreement &amp; Addendum (&quot;Addendum&quot;) modifies the scope of services previously agreed upon between the Client and Operations. Both parties agree that File #<strong>{{file_id}}</strong> will be transitioned to <strong>{{new_category}} (v{{new_version}})</strong> under the updated program guidelines.</p>'
+  },
+  {
+    id: 'checklist',
+    label: '2. Document Checklist & Requirements Update',
+    description: 'Archiving old items and applying the new category checklist',
+    html: '<h3>2. Modification of Requirements &amp; Document Checklist</h3><p>Upon electronic execution of this Addendum by the Client:</p><ol><li>The existing document checklist will be archived and retained in the file audit history.</li><li>A revised document and information checklist for <strong>{{new_category}}</strong> will take effect immediately.</li><li>Any previously approved items incompatible with the new category will be superseded.</li><li>File progression and document reviews resume once required materials are submitted.</li></ol>'
+  },
+  {
+    id: 'priority',
+    label: '3. Priority Handling & Expedited Verification',
+    description: 'Priority handling queues for document reviews',
+    html: '<h3>3. Priority Handling &amp; Expedited Processing</h3><p>Operations will prioritize processing and verification of uploaded documentation for File #<strong>{{file_id}}</strong> under <strong>{{new_category}}</strong> handling queues upon signature receipt.</p>'
+  },
+  {
+    id: 'fees',
+    label: '4. Service Fees & Retainer Scope',
+    description: 'Billing adjustment clause for category scope changes',
+    html: '<h3>4. Service Fees &amp; Retainer Terms</h3><p>Any adjustments to professional fees, disbursements, or retainer schedules associated with <strong>{{new_category}}</strong> will be itemized in the client billing schedule. Unearned retainer balances under <strong>{{old_category}}</strong> will automatically transfer to the new service scope.</p>'
+  },
+  {
+    id: 'consent',
+    label: '5. Client Authorization & Electronic Signature',
+    description: 'Client confirmation and legal electronic signature',
+    html: '<h3>5. Client Authorization &amp; Consent</h3><p>By providing an electronic signature below, the Client confirms that they have reviewed, understood, and agreed to the updated terms and checklist for <strong>{{new_category}}</strong>, and authorize Operations to proceed accordingly.</p>'
+  },
+  {
+    id: 'continuity',
+    label: '6. Continuity of Prior Agreement Terms',
+    description: 'Preserves confidentiality and non-superseded original terms',
+    html: '<p><em>All other terms, confidentiality obligations, and client responsibilities from the initial service agreement remain in full force and effect without modification.</em></p>'
+  }
+];
+
+function interpolateAgreementText(templateBody, vars, isPreview = false) {
   if (!templateBody) return '';
   let text = String(templateBody);
-  if (text.includes('\\n') && !text.includes('\n')) {
-    text = text.replace(/\\n/g, '\n');
+  if (text.includes('\\n')) {
+    text = text.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
   }
   const today = vars.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const wrap = (val, label) => {
+    const s = esc(String(val ?? ''));
+    if (!isPreview) return s;
+    return `<span class="a4-sample-token" title="Auto-filled from ${esc(label)}">${s}</span>`;
+  };
+
   return text
-    .replace(/\{\{\s*client_name\s*\}\}/gi, vars.client_name || '')
-    .replace(/\{\{\s*file_id\s*\}\}/gi, vars.file_id ? String(vars.file_id) : '')
-    .replace(/\{\{\s*old_category\s*\}\}/gi, vars.old_category || 'Current Service')
-    .replace(/\{\{\s*new_category\s*\}\}/gi, vars.new_category || '')
-    .replace(/\{\{\s*target_category\s*\}\}/gi, vars.new_category || '')
-    .replace(/\{\{\s*new_version\s*\}\}/gi, vars.new_version ? String(vars.new_version) : '1')
-    .replace(/\{\{\s*date\s*\}\}/gi, today)
-    .replace(/\{\{\s*portal_url\s*\}\}/gi, vars.portal_url || location.origin);
+    .replace(/\{\{\s*client_name\s*\}\}/gi, wrap(vars.client_name || 'Ahmed Example', 'Client Name'))
+    .replace(/\{\{\s*file_id\s*\}\}/gi, wrap(vars.file_id ? String(vars.file_id) : '1042', 'File #'))
+    .replace(/\{\{\s*old_category\s*\}\}/gi, wrap(vars.old_category || 'Initial Consultation', 'Current Category'))
+    .replace(/\{\{\s*new_category\s*\}\}/gi, wrap(vars.new_category || 'Express Entry Comprehensive', 'New Category'))
+    .replace(/\{\{\s*target_category\s*\}\}/gi, wrap(vars.new_category || 'Express Entry Comprehensive', 'New Category'))
+    .replace(/\{\{\s*new_version\s*\}\}/gi, wrap(vars.new_version ? String(vars.new_version) : '2', 'Version'))
+    .replace(/\{\{\s*date\s*\}\}/gi, wrap(today, 'Date'))
+    .replace(/\{\{\s*portal_url\s*\}\}/gi, wrap(vars.portal_url || location.origin, 'Portal URL'));
 }
 
 function defaultAgreementText(file, targetCategoryName, targetVersion) {
@@ -27,21 +137,13 @@ function formatA4DocumentHtml(title, rawBody, meta = {}, options = {}) {
   const docDate = meta.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   // 1. Process body into sanitized HTML with placeholders interpolated
-  let contentHtml = '';
-  const rawString = String(rawBody || '');
-  if (rawString.startsWith('richtext:v1:')) {
-    contentHtml = globalThis.OperationsRichText ? OperationsRichText.sanitize(rawString.slice(12)) : esc(rawString.slice(12));
-  } else if (/<[a-z][\s\S]*>/i.test(rawString)) {
-    contentHtml = globalThis.OperationsRichText ? OperationsRichText.sanitize(rawString) : rawString;
-  } else {
-    let normalized = rawString;
-    if (normalized.includes('\\n') && !normalized.includes('\n')) {
-      normalized = normalized.replace(/\\n/g, '\n');
-    }
-    contentHtml = guideMarkup(normalized);
-  }
+  const cleanBody = ensureRichAgreementBody(rawBody);
+  let contentHtml = cleanBody.startsWith('richtext:v1:')
+    ? (globalThis.OperationsRichText ? OperationsRichText.sanitize(cleanBody.slice(12)) : cleanBody.slice(12))
+    : cleanBody;
 
-  contentHtml = interpolateAgreementText(contentHtml, meta);
+  const isPreview = options.highlightTokens ?? (mode === 'preview');
+  contentHtml = interpolateAgreementText(contentHtml, meta, isPreview);
 
   // 2. Parse into top-level DOM block elements
   const container = document.createElement('div');
@@ -53,8 +155,8 @@ function formatA4DocumentHtml(title, rawBody, meta = {}, options = {}) {
     childNodes = [p];
   }
 
-  // 3. Deduplicate redundant title / header block in body text
-  if (childNodes.length > 0) {
+  // 3. Deduplicate redundant title / header block in body text (only if more than 1 block exists)
+  if (childNodes.length > 1) {
     const firstTag = childNodes[0].tagName.toUpperCase();
     const firstText = (childNodes[0].textContent || '').trim().toLowerCase();
     const cleanDocTitle = docTitle.toLowerCase();
@@ -62,9 +164,9 @@ function formatA4DocumentHtml(title, rawBody, meta = {}, options = {}) {
       childNodes.shift();
     }
   }
-  if (childNodes.length > 0) {
+  if (childNodes.length > 1) {
     const text = (childNodes[0].textContent || '').toLowerCase();
-    if (text.includes('client name:') && text.includes('file reference:')) {
+    if (text.includes('client name:') && (text.includes('file reference:') || text.includes('category:'))) {
       childNodes.shift();
     }
   }
@@ -488,7 +590,7 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
     };
   }
 
-  const initialBody = interpolateAgreementText(activeTemplate.body, getTemplateVars(firstCat));
+  const initialBody = ensureRichAgreementBody(interpolateAgreementText(activeTemplate.body, getTemplateVars(firstCat), false));
 
   modal('Request Service Category Change', `
     <div class="category-request-form-shell">
@@ -552,9 +654,10 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
       const selectedTpl = templates.find(t => String(t.id) === templateSelect.value) || templates[0];
       activeTemplate = selectedTpl;
       if (titleInput) titleInput.value = selectedTpl.title;
-      const interpolated = interpolateAgreementText(selectedTpl.body, getTemplateVars(selectedCat));
+      const interpolated = interpolateAgreementText(selectedTpl.body, getTemplateVars(selectedCat), false);
       if (modalEditor) {
-        modalEditor.commands.setContent(guideMarkup(interpolated));
+        const cleanHtml = ensureRichAgreementBody(interpolated).replace(/^richtext:v1:/, '');
+        modalEditor.commands.setContent(cleanHtml);
       }
       updateModalPreview();
     };
@@ -592,7 +695,7 @@ function openEditAgreementModal(file, pendingReq, onComplete) {
         <div class="category-modal-form-col">
           ${form('edit-agreement-form',
             input('Agreement title', 'agreementTitle', 'text', pendingReq.agreement_title, 'required maxlength="240"') +
-            guideEditor('Agreement terms & clauses', 'agreementText', pendingReq.agreement_text) +
+            guideEditor('Agreement terms & clauses', 'agreementText', ensureRichAgreementBody(pendingReq.agreement_text)) +
             '<p class="hint">Format text directly using the rich editor. Live A4 preview updates on the right.</p>',
             'Save updated terms'
           )}
@@ -913,7 +1016,18 @@ async function renderAgreementTemplateSettings() {
 
   content.insertAdjacentHTML('beforeend', card(
     'Category change agreements',
-    '<p class="muted">Manage agreement templates used when changing a client\'s service category. Multiple templates can be created here with full rich text formatting and authentic A4 multi-page preview. When staff changes a category on any client file, these templates appear and are previewed before sending for client signature.</p>' +
+    '<div class="agreement-builder-intro">' +
+      '<div class="intro-icon" aria-hidden="true">💡</div>' +
+      '<div class="intro-text">' +
+        '<h4>How Category Change Agreements Work</h4>' +
+        '<p>When staff initiates a category change on any client file, the file is automatically placed on hold and this agreement is sent to the client. Requirements only change once the client electronically signs.</p>' +
+        '<div class="intro-steps">' +
+          '<span class="intro-step"><strong>1. Edit terms:</strong> Format clauses directly like Word or Google Docs.</span>' +
+          '<span class="intro-step"><strong>2. Insert fields:</strong> Use Smart Buttons (Client Name, File #) to inject live file data.</span>' +
+          '<span class="intro-step"><strong>3. Live preview:</strong> Inspect the authentic A4 multi-page document on the right.</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
     '<div class="template-selection">' +
       '<label>Choose agreement template' +
         '<select id="agreement-template-choice" aria-label="Agreement template">' +
@@ -942,32 +1056,91 @@ async function renderAgreementTemplateSettings() {
     selectedAgreementTemplateId = choice.value;
     const t = templates.find(item => String(item.id) === String(choice.value)) || templates[0];
     const pane = section.querySelector('#agreement-template-editor');
+    const richBody = ensureRichAgreementBody(t.body);
 
     pane.innerHTML = `
       <div class="agreement-template-grid">
         <div class="agreement-template-form-col">
           ${form('agreement-template-form',
             input('Template name (management label)', 'name', 'text', t.name, 'required maxlength="160"') +
-            input('Agreement title (shown to client)', 'title', 'text', t.title, 'required maxlength="240"') +
-            '<div class="template-token-list">' +
-              '<strong>Insert placeholder</strong>' +
-              ['client_name', 'file_id', 'old_category', 'new_category', 'new_version', 'date'].map(tok =>
-                `<button type="button" data-agreement-token="${tok}">{{${tok}}}</button>`
-              ).join('') +
-            '</div>' +
-            guideEditor('Agreement terms & legal clauses', 'body', t.body) +
+            input('Agreement title (shown on A4 document header)', 'title', 'text', t.title, 'required maxlength="240"') +
+            `
+            <div class="builder-smart-fields">
+              <div class="smart-fields-header">
+                <div class="smart-fields-title">
+                  <span class="smart-sparkle-icon" aria-hidden="true">✨</span>
+                  <strong>Smart Client Fields</strong>
+                  <span class="smart-helper-pill">Auto-filled for each client</span>
+                </div>
+                <span class="smart-fields-hint">Click a button to insert client details at your cursor position:</span>
+              </div>
+              <div class="smart-fields-buttons">
+                <button type="button" class="smart-token-btn" data-agreement-token="client_name" title="Inserts client's legal full name (e.g. Ahmed Example)">
+                  <span class="tok-icon">👤</span>
+                  <span class="tok-label">Client Name</span>
+                  <code class="tok-code">{{client_name}}</code>
+                </button>
+                <button type="button" class="smart-token-btn" data-agreement-token="file_id" title="Inserts client file reference number (e.g. 1042)">
+                  <span class="tok-icon">📁</span>
+                  <span class="tok-label">File #</span>
+                  <code class="tok-code">{{file_id}}</code>
+                </button>
+                <button type="button" class="smart-token-btn" data-agreement-token="old_category" title="Inserts current active category (e.g. Initial Consultation)">
+                  <span class="tok-icon">🔄</span>
+                  <span class="tok-label">Current Category</span>
+                  <code class="tok-code">{{old_category}}</code>
+                </button>
+                <button type="button" class="smart-token-btn" data-agreement-token="new_category" title="Inserts proposed target category (e.g. Express Entry Comprehensive)">
+                  <span class="tok-icon">✨</span>
+                  <span class="tok-label">New Category</span>
+                  <code class="tok-code">{{new_category}}</code>
+                </button>
+                <button type="button" class="smart-token-btn" data-agreement-token="new_version" title="Inserts category version number (e.g. 2)">
+                  <span class="tok-icon">🏷️</span>
+                  <span class="tok-label">Version #</span>
+                  <code class="tok-code">{{new_version}}</code>
+                </button>
+                <button type="button" class="smart-token-btn" data-agreement-token="date" title="Inserts current execution date">
+                  <span class="tok-icon">📅</span>
+                  <span class="tok-label">Today's Date</span>
+                  <code class="tok-code">{{date}}</code>
+                </button>
+              </div>
+            </div>
+
+            <div class="builder-clause-helper">
+              <div class="clause-helper-row">
+                <label for="quick-clause-selector" class="clause-helper-label">
+                  <span class="clause-icon" aria-hidden="true">📜</span>
+                  <strong>Add standard legal clause:</strong>
+                </label>
+                <select id="quick-clause-selector" class="clause-select" aria-label="Select pre-made legal clause to insert">
+                  <option value="">Choose a pre-approved clause to insert at cursor...</option>
+                  ${STANDARD_AGREEMENT_CLAUSES.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
+                </select>
+                <button type="button" id="insert-clause-btn" class="secondary clause-btn">➕ Insert Clause</button>
+              </div>
+            </div>
+            ` +
+            guideEditor('Agreement terms & legal clauses', 'body', richBody) +
             `<label class="agreement-default-checkbox"><input type="checkbox" name="isDefault" ${t.is_default ? 'checked' : ''}><span>Set as default template for category changes</span></label>` +
-            '<p class="hint">Placeholders like {{client_name}}, {{old_category}}, and {{new_category}} are automatically filled from client and category records upon category change.</p>',
+            '<p class="hint">The legal terms authored above will be printed on the official A4 agreement sent to clients when their service category changes.</p>',
             'Save agreement template'
           )}
-          <div class="row-actions">
-            <button id="delete-agreement-template" class="danger-button">Delete template</button>
+          <div class="row-actions agreement-template-row-actions">
+            <button type="button" id="reset-agreement-template" class="secondary reset-template-btn" title="Reset this template's text back to clean standard clauses">🔄 Reset to standard clauses</button>
+            <button type="button" id="delete-agreement-template" class="danger-button">Delete template</button>
           </div>
         </div>
         <div class="agreement-template-preview-col" role="region" aria-label="Agreement template preview">
           <div class="preview-heading">
-            <strong>Live Agreement Preview</strong>
-            <span class="preview-badge">A4 Page View · Auto-Break</span>
+            <div class="preview-title-wrap">
+              <strong>Live Agreement Preview</strong>
+              <span class="preview-badge">A4 Page View · Auto-Break</span>
+            </div>
+            <div class="preview-actions">
+              <button type="button" id="fullscreen-a4-preview-btn" class="preview-action-btn" title="Inspect full document in large modal view">👁️ Fullscreen A4</button>
+            </div>
           </div>
           <div id="settings-a4-preview-viewport" class="a4-document-viewport"></div>
         </div>
@@ -999,7 +1172,7 @@ async function renderAgreementTemplateSettings() {
         currentTitle,
         currentHtml,
         sampleVars,
-        { mode: 'preview' }
+        { mode: 'preview', highlightTokens: true }
       );
     }
 
@@ -1040,6 +1213,62 @@ async function renderAgreementTemplateSettings() {
         }
       };
     });
+
+    // Clause inserter handler
+    const clauseSelect = pane.querySelector('#quick-clause-selector');
+    const insertBtn = pane.querySelector('#insert-clause-btn');
+    if (insertBtn && clauseSelect) {
+      insertBtn.onclick = () => {
+        const clauseId = clauseSelect.value;
+        const clause = STANDARD_AGREEMENT_CLAUSES.find(c => c.id === clauseId);
+        if (!clause) {
+          report(new Error('Please select a clause from the dropdown first.'));
+          return;
+        }
+        if (editor) {
+          editor.chain().focus().insertContent(clause.html).run();
+          clauseSelect.value = '';
+          schedulePreview();
+          success(`Inserted "${clause.label}".`);
+        }
+      };
+    }
+
+    // Reset template handler
+    const resetBtn = pane.querySelector('#reset-agreement-template');
+    if (resetBtn) {
+      resetBtn.onclick = () => {
+        if (!confirm('Reset this template\'s legal clauses to standard clauses? Your current edits in the editor will be replaced.')) return;
+        const defaultRaw = defaultAgreementText(null, '{{new_category}}', '{{new_version}}');
+        const cleanDefaultHtml = ensureRichAgreementBody(defaultRaw).replace(/^richtext:v1:/, '');
+        if (editor) {
+          editor.commands.setContent(cleanDefaultHtml);
+          schedulePreview();
+          success('Template terms reset to standard clauses.');
+        }
+      };
+    }
+
+    // Fullscreen A4 Preview handler
+    const fullscreenBtn = pane.querySelector('#fullscreen-a4-preview-btn');
+    if (fullscreenBtn) {
+      fullscreenBtn.onclick = () => {
+        const currentTitle = titleInput ? titleInput.value.trim() : t.title;
+        const currentHtml = editor ? editor.getHTML() : (t.body || '');
+        const modalHtml = `
+          <div class="agreement-fullscreen-shell">
+            <div class="modal-signing-viewport a4-document-viewport" style="max-height: 75vh;">
+              ${formatA4DocumentHtml(currentTitle, currentHtml, sampleVars, { mode: 'preview', highlightTokens: true })}
+            </div>
+            <div class="modal-signing-footer">
+              <button type="button" class="print-btn secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
+              <button type="button" class="primary" onclick="closeModal()">Done</button>
+            </div>
+          </div>
+        `;
+        modal('Full Agreement Preview (A4 Page View)', modalHtml);
+      };
+    }
 
     bindForm('agreement-template-form', async (v, f) => {
       const isDefault = f.elements.isDefault.checked;
@@ -1083,7 +1312,7 @@ async function renderAgreementTemplateSettings() {
   draw();
 
   action('#new-agreement-template', async () => {
-    const defaultBody = 'richtext:v1:<h3>1. Scope of Service Modification</h3><p>This Service Change Agreement &amp; Addendum (&quot;Addendum&quot;) modifies the scope of services previously agreed upon between the Client and Operations. Both parties agree that the client\'s file will be transitioned to <strong>{{new_category}}</strong> (v{{new_version}}).</p><h3>2. Modification of Requirements &amp; Document Checklist</h3><p>Upon execution of this Addendum by the Client:</p><ol><li>The existing document checklist will be archived and retained in the file history.</li><li>A revised document and information checklist for <strong>{{new_category}}</strong> will take effect immediately.</li><li>Any previously approved items incompatible with the new category will be superseded.</li><li>File progression, reviews, and document collection are temporarily held until this Addendum is executed or cancelled by Operations.</li></ol><h3>3. Client Authorization &amp; Consent</h3><p>By signing below, the Client confirms that they have reviewed and agreed to the terms of this service transition, and authorize Operations to update the service checklist and requirements for this file.</p><p><em>All other terms, conditions, and obligations of the initial service engagement remain in full force and effect.</em></p>';
+    const defaultBody = defaultAgreementText(null, '{{new_category}}', '{{new_version}}');
     const created = await api('agreement-templates', 'POST', {
       name: `New Service Agreement ${templates.length + 1}`,
       title: 'Service Change Agreement & Addendum',
