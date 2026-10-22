@@ -99,22 +99,53 @@ catalog.patch('/cases/:id/category-request/:requestId',manage,async(req,res)=>{
  res.json({saved:true});
 });
 
-catalog.post('/cases/:id/category-request/:requestId/cancel',manage,async(req,res)=>{
- const reason=typeof req.body.reason==='string'&&req.body.reason.trim()?req.body.reason.trim().slice(0,500):'Cancelled by Operations';
- await transaction(async c=>{
-  const file=await loadCase(c,req.params.id,req.user,true);
-  const [reqs]=await c.execute(
-   'SELECT r.*, c.name AS target_name FROM category_change_requests r JOIN categories c ON c.id=r.target_category_id WHERE r.id=? AND r.case_id=? FOR UPDATE',
-   [req.params.requestId,file.id]
-  );
-  if(!reqs.length)fail('Category change request not found.',404);
-  const existing=reqs[0];
-  if(existing.status!=='PENDING')fail('This request is no longer pending and cannot be cancelled.',409);
-  await c.execute("UPDATE category_change_requests SET status='CANCELLED',cancelled_by=?,cancelled_at=NOW(),cancel_reason=? WHERE id=?",[req.user.id,reason,existing.id]);
-  await event(c,file.id,req.user,'CATEGORY_CHANGE_CANCELLED',`Category change request to ${existing.target_name} cancelled: ${reason}. Original category retained.`,true);
-  await notify(c,file.client_user_id,file.id,`category-cancel:${existing.id}`,`The category change request to ${existing.target_name} was cancelled.`);
- });
- res.json({cancelled:true});
+catalog.post('/cases/:id/category-request/:requestId/cancel', async (req, res) => {
+  const rawReason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+  if (!rawReason || rawReason.length < 3) {
+    fail('Please provide a reason for stopping this category change (minimum 3 characters).');
+  }
+  const reason = rawReason.slice(0, 500);
+
+  await transaction(async c => {
+    const file = await loadCase(c, req.params.id, req.user, true);
+    const [reqs] = await c.execute(
+      'SELECT r.*, c.name AS target_name FROM category_change_requests r JOIN categories c ON c.id=r.target_category_id WHERE r.id=? AND r.case_id=? FOR UPDATE',
+      [req.params.requestId, file.id]
+    );
+    if (!reqs.length) fail('Category change request not found.', 404);
+    const existing = reqs[0];
+    if (existing.status !== 'PENDING') fail('This request is no longer pending and cannot be cancelled.', 409);
+
+    const isClient = req.user.role === 'CLIENT';
+    const actorLabel = isClient ? 'Client' : (req.user.name || 'Operations');
+
+    await c.execute(
+      "UPDATE category_change_requests SET status='CANCELLED',cancelled_by=?,cancelled_at=NOW(),cancel_reason=? WHERE id=?",
+      [req.user.id, reason, existing.id]
+    );
+    await event(
+      c,
+      file.id,
+      req.user,
+      'CATEGORY_CHANGE_CANCELLED',
+      `Category change request to ${existing.target_name} stopped by ${actorLabel}: ${reason}. Original category retained.`,
+      true
+    );
+
+    if (isClient) {
+      if (file.assigned_to) {
+        await notify(c, file.assigned_to, file.id, `category-cancel:${existing.id}`, `Client stopped the category change to ${existing.target_name}. Reason: ${reason}`);
+      }
+      await managers(c, file.id, `category-cancel:${existing.id}`, `Category change to ${existing.target_name} stopped by client for file #${file.id}. Reason: ${reason}`);
+    } else {
+      await notify(c, file.client_user_id, file.id, `category-cancel:${existing.id}`, `The category change request to ${existing.target_name} was stopped by Operations: ${reason}`);
+      if (file.assigned_to && file.assigned_to !== req.user.id) {
+        await notify(c, file.assigned_to, file.id, `category-cancel:${existing.id}`, `Category change to ${existing.target_name} was stopped by ${actorLabel}. Reason: ${reason}`);
+      }
+    }
+  });
+
+  res.json({ cancelled: true, reason });
 });
 
 catalog.post('/cases/:id/category-request/:requestId/sign',async(req,res)=>{

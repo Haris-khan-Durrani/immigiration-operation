@@ -665,14 +665,17 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
       </div>
       <div class="category-modal-layout">
         <div class="category-modal-form-col">
-          ${form('category-request-form',
-            select('Target service category', 'categoryId', publishedCats.map(c => [c.id, `${c.name} (version ${c.version})`])) +
-            select('Choose agreement template', 'templateId', templates.map(t => [t.id, `${t.name}${t.is_default ? ' · Default' : ''}`]), activeTemplate.id) +
-            input('Agreement title', 'agreementTitle', 'text', activeTemplate.title, 'required maxlength="240"') +
-            guideEditor('Agreement terms & addendum clauses', 'agreementText', initialBody) +
-            '<p class="hint">You can review and edit these terms using the rich text tools before sending them to the client for signature.</p>',
-            'Send agreement to client'
-          )}
+          <form id="category-request-form">
+            ${select('Target service category', 'categoryId', publishedCats.map(c => [c.id, `${c.name} (version ${c.version})`]))}
+            ${select('Choose agreement template', 'templateId', templates.map(t => [t.id, `${t.name}${t.is_default ? ' · Default' : ''}`]), activeTemplate.id)}
+            ${input('Agreement title', 'agreementTitle', 'text', activeTemplate.title, 'required maxlength="240"')}
+            ${guideEditor('Agreement terms & addendum clauses', 'agreementText', initialBody)}
+            <p class="hint">You can review and edit these terms using the rich text tools before sending them to the client for signature. You can cancel and close this modal at any time.</p>
+            <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+              <button type="button" id="discard-category-modal-btn" class="secondary">Cancel &amp; Close</button>
+              <button type="submit" class="primary">Send agreement to client</button>
+            </div>
+          </form>
         </div>
         <div class="category-modal-preview-col">
           <div class="modal-preview-card">
@@ -732,6 +735,14 @@ async function openCategoryRequestModal(file, publishedCats, onComplete) {
   }
 
   updateModalPreview();
+
+  const discardBtn = document.querySelector('#discard-category-modal-btn');
+  if (discardBtn) {
+    discardBtn.onclick = () => {
+      destroyGuideEditors();
+      closeModal();
+    };
+  }
 
   bindForm('category-request-form', async v => {
     const finalBody = modalEditor && !modalEditor.isEmpty
@@ -828,24 +839,33 @@ async function openEditAgreementModal(file, pendingReq, onComplete) {
 }
 
 function openCancelAgreementModal(file, pendingReq, onComplete) {
-  modal('Cancel Category Change Request', `
+  modal('Stop Category Change Process', `
     <div class="category-cancel-shell">
-      <p>Are you sure you want to cancel the pending category change to <strong>${esc(pendingReq.target_category_name)}</strong>?</p>
-      <p class="hint">The file will unfreeze and continue on its current category (<strong>${esc(file.category_name || 'Current Category')}</strong>). Previous requirements and documents will remain intact.</p>
+      <div class="notice" style="border-left: 4px solid var(--danger, #dc2626); background: #fef2f2; padding: 12px 14px; border-radius: 6px; margin-bottom: 14px;">
+        <strong style="color: #991b1b; display: block; margin-bottom: 4px;">Stop Category Change &amp; Resume File</strong>
+        <p style="margin: 0; color: #7f1d1d; font-size: 13px;">Stopping this process will unfreeze File #${esc(file.id)} and resume work under its current category (<strong>${esc(file.category_name || 'Current Service')}</strong>). The pending agreement will be voided.</p>
+      </div>
+      <p style="font-size: 14px; margin-bottom: 10px;">Please define the reason for stopping this process. <strong>This reason is required</strong>:</p>
       ${form('cancel-category-form',
-        area('Reason for cancellation (optional)', 'reason', '', 'placeholder="e.g. Client requested to keep current service..." maxlength="500"'),
-        'Confirm cancellation'
+        area('Reason for stopping this process (Required)', 'reason', '', 'placeholder="e.g. Client decided to remain in current program / requirements changed / requested by applicant..." minlength="3" maxlength="500" required') +
+        '<p class="hint">This reason will be recorded in the file audit trail, visible in the agreement history, and sent to relevant parties.</p>',
+        'Stop Process &amp; Resume File'
       )}
     </div>
   `);
 
   bindForm('cancel-category-form', async v => {
+    const reason = (v.reason || '').trim();
+    if (!reason || reason.length < 3) {
+      report('Please define a valid reason (at least 3 characters) to stop this process.');
+      return;
+    }
     await api(`cases/${file.id}/category-request/${pendingReq.id}/cancel`, 'POST', {
-      reason: v.reason || 'Cancelled by Operations'
+      reason
     });
     closeModal();
     if (onComplete) await onComplete();
-    success('Category change request cancelled. File resumed on original category.');
+    success('Category change process stopped. File resumed on original category.');
   });
 }
 
@@ -884,9 +904,12 @@ async function openSignatureModal(file, pendingReq, onComplete) {
         )}
       </div>
 
-      <div class="modal-signing-footer">
-        <button type="button" id="close-sign-modal" class="secondary">Close</button>
-        <button type="button" id="submit-signature-btn" class="primary pulse-btn" disabled>Sign & Accept Agreement</button>
+      <div class="modal-signing-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <button type="button" id="decline-sign-modal-btn" class="secondary danger-text" style="color: var(--danger, #dc2626); border-color: #fca5a5;">Stop / Decline Request</button>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" id="close-sign-modal" class="secondary">Close</button>
+          <button type="button" id="submit-signature-btn" class="primary pulse-btn" disabled>Sign & Accept Agreement</button>
+        </div>
       </div>
     </div>
   `);
@@ -897,10 +920,24 @@ async function openSignatureModal(file, pendingReq, onComplete) {
   const submitBtn = document.querySelector('#submit-signature-btn');
   const clearBtn = document.querySelector('#clear-signature-btn');
   const closeBtn = document.querySelector('#close-sign-modal');
+  const declineBtn = document.querySelector('#decline-sign-modal-btn');
   const printBtn = document.querySelector('#print-signing-doc');
   const canvasHint = document.querySelector('#canvas-hint');
 
-  if (printBtn) printBtn.onclick = () => window.print();
+  if (printBtn) {
+    printBtn.onclick = () => {
+      const origTitle = document.title;
+      document.title = `Service-Agreement-File-${file.id}`.replace(/\s+/g, '-');
+      window.print();
+      setTimeout(() => { document.title = origTitle; }, 1000);
+    };
+  }
+
+  if (declineBtn) {
+    declineBtn.onclick = () => {
+      openCancelAgreementModal(file, pendingReq, onComplete);
+    };
+  }
 
   const pad = initSignaturePad(canvas, (hasDrawn) => {
     if (canvasHint) canvasHint.hidden = hasDrawn;
@@ -961,17 +998,22 @@ async function openViewSignedAgreementModal(req) {
     ref_code: `AGR-${req.case_id}-${req.id}`
   };
 
+  const isSigned = req.status === 'SIGNED';
+
   modal(req.agreement_title || 'Service Change Agreement', `
     <div class="agreement-signing-modal">
       <div class="agreement-modal-header">
         <div>
-          <span class="eyebrow">OFFICIAL EXECUTED RECORD</span>
+          <span class="eyebrow">${isSigned ? 'OFFICIAL EXECUTED RECORD' : 'OFFICIAL SERVICE AGREEMENT'}</span>
           <h3>${esc(req.agreement_title)}</h3>
           <p>Amended Target: <strong>${esc(req.target_category_name)}</strong> · File #${req.case_id || '—'}</p>
         </div>
         <div class="header-action-group">
-          <button type="button" id="print-view-doc" class="secondary print-btn" title="Print or save as PDF">🖨️ Print / Save PDF</button>
-          <span class="badge ${req.status==='SIGNED'?'accepted':req.status==='CANCELLED'?'cancelled':'pending'}">${req.status}</span>
+          ${isSigned ? `
+            <button type="button" id="download-contract-pdf" class="primary print-btn" title="Download Signed Agreement Contract as PDF">⬇️ Download Contract (PDF)</button>
+          ` : ''}
+          <button type="button" id="print-view-doc" class="secondary print-btn" title="Print document">🖨️ Print</button>
+          <span class="badge ${req.status==='SIGNED'?'accepted':req.status==='CANCELLED'?'cancelled':'pending'}">${req.status==='SIGNED'?'Signed':req.status==='CANCELLED'?'Stopped':req.status}</span>
         </div>
       </div>
 
@@ -991,15 +1033,48 @@ async function openViewSignedAgreementModal(req) {
         )}
       </div>
 
-      <div class="modal-signing-footer">
-        <button type="button" id="close-view-agreement" class="primary">Close document</button>
+      <div class="modal-signing-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        ${isSigned ? `
+          <button type="button" id="footer-download-contract-pdf" class="primary print-btn">⬇️ Download Contract (PDF)</button>
+        ` : '<div></div>'}
+        <button type="button" id="close-view-agreement" class="secondary">Close document</button>
       </div>
     </div>
   `);
 
   action('#close-view-agreement', closeModal);
+
+  const downloadContract = () => {
+    const origTitle = document.title;
+    const catClean = (req.target_category_name || 'Contract').replace(/[^a-zA-Z0-9_-]/g, '_');
+    document.title = `Signed-Service-Agreement-File-${req.case_id || 'Case'}-${catClean}`;
+    window.print();
+    setTimeout(() => { document.title = origTitle; }, 1000);
+  };
+
+  action('#download-contract-pdf', downloadContract);
+  action('#footer-download-contract-pdf', downloadContract);
+
   const printBtn = document.querySelector('#print-view-doc');
-  if (printBtn) printBtn.onclick = () => window.print();
+  if (printBtn) {
+    printBtn.onclick = () => {
+      const origTitle = document.title;
+      document.title = `Service-Agreement-File-${req.case_id || 'Case'}`;
+      window.print();
+      setTimeout(() => { document.title = origTitle; }, 1000);
+    };
+  }
+}
+
+async function triggerAgreementDownload(req) {
+  await openViewSignedAgreementModal(req);
+  setTimeout(() => {
+    const origTitle = document.title;
+    const catClean = (req.target_category_name || 'Contract').replace(/[^a-zA-Z0-9_-]/g, '_');
+    document.title = `Signed-Service-Agreement-File-${req.case_id || 'Case'}-${catClean}`;
+    window.print();
+    setTimeout(() => { document.title = origTitle; }, 1000);
+  }, 350);
 }
 
 function renderCategoryHoldBanner(pendingReq) {
@@ -1016,11 +1091,11 @@ function renderCategoryHoldBanner(pendingReq) {
           <span class="badge pending">Target: ${esc(pendingReq.target_category_name)}</span>
         </div>
         <h3>Category change agreement pending</h3>
-        <p>A service change agreement to switch this file to <strong>${esc(pendingReq.target_category_name)}</strong> is awaiting the client’s signature. Submissions, reviews, and status changes are paused until the agreement is signed or cancelled.</p>
+        <p>A service change agreement to switch this file to <strong>${esc(pendingReq.target_category_name)}</strong> is awaiting the client’s signature. Submissions, reviews, and status changes are paused until the agreement is signed or stopped.</p>
       </div>
       <div class="hold-banner-controls">
         <button type="button" id="edit-pending-agreement" class="secondary">Edit agreement terms</button>
-        <button type="button" id="cancel-pending-agreement" class="danger">Cancel change request</button>
+        <button type="button" id="cancel-pending-agreement" class="danger">Stop category change</button>
       </div>
     </section>
   `;
@@ -1041,8 +1116,9 @@ function renderClientAgreementBanner(pendingReq) {
           <p>Operations has proposed transitioning your application to <strong>${esc(pendingReq.target_category_name)}</strong>. Please review and electronically sign the updated service agreement so we can update your checklist and proceed with your file.</p>
         </div>
       </div>
-      <div class="client-agreement-action-row">
-        <button type="button" id="client-review-agreement" class="primary pulse-btn">Review & Sign Agreement →</button>
+      <div class="client-agreement-action-row" style="display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap;">
+        <button type="button" id="client-decline-agreement" class="secondary danger-text" style="color: var(--danger, #dc2626); border-color: #fca5a5;">Stop / Decline Request</button>
+        <button type="button" id="client-review-agreement" class="primary pulse-btn">Review &amp; Sign Agreement →</button>
       </div>
     </section>
   `;
@@ -1061,10 +1137,16 @@ function renderAgreementHistory(changeRequests) {
           <div class="agreement-history-item ${r.status.toLowerCase()}">
             <div class="agreement-item-info">
               <span class="agreement-item-title">${esc(r.agreement_title)}</span>
-              <small>Target: <strong>${esc(r.target_category_name)}</strong> · ${r.status === 'SIGNED' ? 'Signed ' + date(r.signed_at) : r.status === 'CANCELLED' ? 'Cancelled ' + date(r.cancelled_at) : 'Created ' + date(r.created_at)}</small>
+              <small>Target: <strong>${esc(r.target_category_name)}</strong> · ${r.status === 'SIGNED' ? 'Signed ' + date(r.signed_at) : r.status === 'CANCELLED' ? 'Stopped ' + date(r.cancelled_at) : 'Created ' + date(r.created_at)}</small>
+              ${r.status === 'CANCELLED' && r.cancel_reason ? `
+                <div class="agreement-cancel-reason" style="margin-top: 5px; padding: 4px 8px; background: #fef2f2; border-left: 3px solid var(--danger, #dc2626); border-radius: 4px;">
+                  <small style="color: #991b1b;"><strong>Reason for stopping:</strong> ${esc(r.cancel_reason)}</small>
+                </div>
+              ` : ''}
             </div>
-            <div class="agreement-item-meta">
-              <span class="badge ${r.status === 'SIGNED' ? 'accepted' : r.status === 'CANCELLED' ? 'cancelled' : 'pending'}">${r.status === 'SIGNED' ? 'Signed' : r.status === 'CANCELLED' ? 'Cancelled' : 'Pending'}</span>
+            <div class="agreement-item-meta" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <span class="badge ${r.status === 'SIGNED' ? 'accepted' : r.status === 'CANCELLED' ? 'cancelled' : 'pending'}">${r.status === 'SIGNED' ? 'Signed' : r.status === 'CANCELLED' ? 'Stopped' : 'Pending'}</span>
+              ${r.status === 'SIGNED' ? `<button type="button" class="secondary small download-agreement-btn" data-download-agreement="${r.id}" title="Download Signed PDF Contract">⬇️ Download PDF</button>` : ''}
               <button type="button" class="view-agreement-btn" data-view-agreement="${r.id}">View agreement →</button>
             </div>
           </div>
