@@ -33,6 +33,7 @@ try {
   const [internalStarted]=await db.query("SHOW COLUMNS FROM internal_email_outbox LIKE 'started_at'");if(!internalStarted.length)await db.query('ALTER TABLE internal_email_outbox ADD started_at DATETIME NULL');
   const [statusColors]=await db.query("SHOW COLUMNS FROM file_statuses LIKE 'color'");if(!statusColors.length)await db.query("ALTER TABLE file_statuses ADD color VARCHAR(7) NOT NULL DEFAULT '#137f75'");
   for(const [table,name,type] of [['users','must_change_password','BOOLEAN NOT NULL DEFAULT FALSE'],['handoff_events','intake_id','BIGINT UNSIGNED NULL']]){const [existing]=await db.query(`SHOW COLUMNS FROM ${table} LIKE ?`,[name]);if(!existing.length)await db.query(`ALTER TABLE ${table} ADD ${name} ${type}`);}
+  await db.query("CREATE TABLE IF NOT EXISTS password_resets (token_hash CHAR(64) PRIMARY KEY, user_id BIGINT UNSIGNED NOT NULL, expires_at DATETIME NOT NULL, used_at DATETIME NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_user (user_id), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)");
   await db.query("INSERT IGNORE INTO application_settings (id,settings) VALUES (1,JSON_OBJECT('activationDate',NULL,'allowedPipelines',JSON_ARRAY(),'defaultCategoryId',NULL,'defaultAgentId',NULL,'ghlMediaCopy',false,'mediaPrivacyVerified',false))");
   console.log('MySQL schema initialized.');
 } finally { await db.end(); }

@@ -22,8 +22,64 @@ function bindForm(id,handler){const f=document.getElementById(id);if(f)f.onsubmi
 function action(selector,handler){document.querySelectorAll(selector).forEach(b=>b.onclick=async()=>{b.disabled=true;try{await handler(b);}catch(e){report(e);}finally{b.disabled=false;}});}
 function modal(title,body){destroyGuideEditors();document.querySelector('#dialog-content').innerHTML=`<div class="modal-heading"><h2>${esc(title)}</h2><button id="close-dialog" aria-label="Close">×</button></div>${body}`;document.querySelector('#dialog').showModal();document.querySelector('#close-dialog').onclick=closeModal;}
 function closeModal(){destroyGuideEditors();document.querySelector('#dialog').close();}
-function signedIn(value){document.body.classList.remove('session-pending');document.querySelector('#session-loading').hidden=true;user=value;if(!value){document.querySelector('#daily-work').hidden=true;document.querySelector('#notification-count').hidden=true;}document.body.classList.toggle('client-portal-mode',!!user&&user.role==='CLIENT');document.body.classList.toggle('signed-out',!user);document.querySelector('#login').hidden=!!user;content.hidden=!user;document.querySelector('#identity').textContent=user?user.name:'My account';document.querySelector('#avatar').textContent=user?user.name[0].toUpperCase():'O';document.querySelectorAll('[data-view]').forEach(b=>{b.hidden=!!user&&((['users','settings'].includes(b.dataset.view)&&user.role!=='ADMIN')||(['intake','categories','statuses','automations','audit','tasks','documents'].includes(b.dataset.view)&&!staff())||(b.dataset.view==='audit'&&user.role==='AGENT'));});document.querySelector('#management-nav').closest('.nav-bottom').classList.toggle('client-nav',!!user&&!staff());}
+function switchLoginView(view){
+ const signin=document.querySelector('#login-view-signin'),forgot=document.querySelector('#login-view-forgot'),reset=document.querySelector('#login-view-reset');
+ if(!signin||!forgot||!reset)return;
+ signin.hidden=view!=='signin';forgot.hidden=view!=='forgot';reset.hidden=view!=='reset';
+ const feedbackForgot=document.querySelector('#forgot-password-feedback');if(feedbackForgot)feedbackForgot.hidden=true;
+ const feedbackReset=document.querySelector('#reset-password-feedback');if(feedbackReset)feedbackReset.hidden=true;
+}
+function checkResetUrl(){
+ const token=new URLSearchParams(location.search).get('reset');
+ if(!token)return;
+ switchLoginView('reset');
+ const sub=document.querySelector('#reset-password-subtitle'),feedback=document.querySelector('#reset-password-feedback'),form=document.querySelector('#reset-password-form');
+ api('auth/verify-reset-token?token='+encodeURIComponent(token)).then(res=>{
+  if(res.name&&sub)sub.textContent=`Choose a new password for ${res.name} (${res.email}).`;
+ }).catch(err=>{
+  if(form)form.hidden=true;
+  if(feedback){feedback.textContent=err.message||'This password reset link is invalid or has expired.';feedback.className='login-feedback error';feedback.hidden=false;}
+ });
+}
+function initLoginAuth(){
+ const forgotToggle=document.querySelector('#forgot-password-toggle');
+ if(forgotToggle)forgotToggle.onclick=()=>{
+  const email=document.querySelector('#email')?.value||'';
+  if(email&&document.querySelector('#forgot-email'))document.querySelector('#forgot-email').value=email;
+  switchLoginView('forgot');
+ };
+ const backLink=document.querySelector('#back-to-signin-link');
+ if(backLink)backLink.onclick=()=>switchLoginView('signin');
+ const cancelResetLink=document.querySelector('#cancel-reset-link');
+ if(cancelResetLink)cancelResetLink.onclick=()=>{
+  history.replaceState({},'','/login');
+  const form=document.querySelector('#reset-password-form');if(form)form.hidden=false;
+  switchLoginView('signin');
+ };
+ bindForm('forgot-password-form',async v=>{
+  const feedback=document.querySelector('#forgot-password-feedback');
+  if(feedback)feedback.hidden=true;
+  const res=await api('auth/forgot-password','POST',{email:v.email});
+  if(feedback){feedback.textContent=res.message||'If an account exists with that email, a password reset link has been sent. Please check your inbox.';feedback.className='login-feedback success';feedback.hidden=false;}
+ });
+ bindForm('reset-password-form',async v=>{
+  const feedback=document.querySelector('#reset-password-feedback');
+  if(feedback)feedback.hidden=true;
+  if(v.password!==v.confirmPassword)throw new Error('New passwords do not match. Please re-enter.');
+  const token=new URLSearchParams(location.search).get('reset');
+  if(!token)throw new Error('Reset link is missing or has expired. Please request a new link.');
+  const res=await api('auth/reset-password','POST',{token,password:v.password});
+  success(res.message||'Password reset successfully. Please sign in with your new password.');
+  if(res.email&&document.querySelector('#email'))document.querySelector('#email').value=res.email;
+  history.replaceState({},'','/login');
+  const form=document.querySelector('#reset-password-form');if(form)form.hidden=false;
+  switchLoginView('signin');
+ });
+ checkResetUrl();
+}
+function signedIn(value){document.body.classList.remove('session-pending');document.querySelector('#session-loading').hidden=true;user=value;if(!value){document.querySelector('#daily-work').hidden=true;document.querySelector('#notification-count').hidden=true;switchLoginView('signin');checkResetUrl();}document.body.classList.toggle('client-portal-mode',!!user&&user.role==='CLIENT');document.body.classList.toggle('signed-out',!user);document.querySelector('#login').hidden=!!user;content.hidden=!user;document.querySelector('#identity').textContent=user?user.name:'My account';document.querySelector('#avatar').textContent=user?user.name[0].toUpperCase():'O';document.querySelectorAll('[data-view]').forEach(b=>{b.hidden=!!user&&((['users','settings'].includes(b.dataset.view)&&user.role!=='ADMIN')||(['intake','categories','statuses','automations','audit','tasks','documents'].includes(b.dataset.view)&&!staff())||(b.dataset.view==='audit'&&user.role==='AGENT'));});document.querySelector('#management-nav').closest('.nav-bottom').classList.toggle('client-nav',!!user&&!staff());}
 bindForm('login-form',async()=>{signedIn(await api('auth/login','POST',{email:document.querySelector('#email').value,password:document.querySelector('#password').value}));document.querySelector('#password').value='';restoreWorkspaceUrl();await render(true);});
+initLoginAuth();
 document.querySelector('#logout').onclick=async()=>{try{await api('auth/logout','POST');signedIn(null);clientPreview=null;selectedCase=null;document.body.classList.remove('client-preview-mode');history.replaceState({},'','/login');content.innerHTML='';closeModal();}catch(e){report(e);}};
 document.querySelector('#identity').onclick=()=>{current='account';render().catch(report);};document.querySelector('#notifications').onclick=()=>{current='notifications';render().catch(report);};
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{clientPreview=null;document.body.classList.remove('client-preview-mode');current=user.must_change_password?'account':b.dataset.view;selectedCase=null;selectedDocument=null;conversationExpanded=false;render().catch(report);});

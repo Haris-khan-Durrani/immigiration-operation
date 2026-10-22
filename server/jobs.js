@@ -7,9 +7,10 @@ import {emailSettings,deliverEmail} from './email.js';
 import {missingDocumentLabels} from './domain.js';
 import {portalBase} from './connection.js';
 import {transaction,notify,queueEmail} from './workflow.js';
-export async function runJobs({send}={}) {
- await db.query('DELETE FROM sessions WHERE expires_at<NOW()');
- await db.query('DELETE FROM notifications WHERE created_at<DATE_SUB(NOW(),INTERVAL 30 DAY)');
+ export async function runJobs({send}={}) {
+  await db.query('DELETE FROM sessions WHERE expires_at<NOW()');
+  await db.query('DELETE FROM password_resets WHERE expires_at<DATE_SUB(NOW(),INTERVAL 7 DAY)');
+  await db.query('DELETE FROM notifications WHERE created_at<DATE_SUB(NOW(),INTERVAL 30 DAY)');
  await db.query("DELETE n FROM notifications n JOIN tasks t ON n.event_key=CONCAT('task:',t.id) OR n.event_key=CONCAT('overdue-task:',t.id) WHERE t.status='DONE'");
  await db.query("DELETE FROM tasks WHERE status='DONE'");
  await transaction(async c=>{
